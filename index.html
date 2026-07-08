@@ -78,6 +78,16 @@
       <h2>매물 목록</h2>
       <button class="btn-new" onclick="startRegister()">+ 신규 매물 등록</button>
       <div class="filter-row">
+        <input type="text" id="filterAddress" placeholder="소재지 검색 (예: 남원읍)" oninput="applyFilters()" style="flex:1; padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+      </div>
+      <div class="filter-row">
+        <select id="filterType" onchange="applyFilters()">
+          <option value="">유형: 전체</option>
+          <option value="토지">토지</option>
+          <option value="상가">상가</option>
+          <option value="공장창고">공장창고</option>
+          <option value="주택">주택</option>
+        </select>
         <select id="filterStatus" onchange="applyFilters()">
           <option value="">상태: 전체</option>
           <option value="1.광고중" selected>1.광고중</option>
@@ -100,16 +110,6 @@
           <option value="임차 월세">임차 월세</option>
           <option value="임차 단기">임차 단기</option>
         </select>
-        <select id="filterType" onchange="applyFilters()">
-          <option value="">유형: 전체</option>
-          <option value="토지">토지</option>
-          <option value="상가">상가</option>
-          <option value="공장창고">공장창고</option>
-          <option value="주택">주택</option>
-        </select>
-      </div>
-      <div class="filter-row">
-        <input type="text" id="filterAddress" placeholder="소재지 검색 (예: 남원읍)" oninput="applyFilters()" style="flex:1; padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
       </div>
       <div class="filter-row">
         <input type="number" id="filterMinPrice" placeholder="최소금액" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
@@ -283,11 +283,11 @@
 </div>
 
 <!-- appkey를 본인의 카카오 JavaScript 키로 교체하세요. libraries=services는 주소 검색(지오코딩)에 필요합니다 -->
-<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=3e39f7248f3829204f5bd2ef0cf24e94&libraries=services"></script>
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=여기에_카카오_JS_키&libraries=services"></script>
 <script>
   // 아래 값들을 본인 환경(테스트 시트=map_test_1 기준)에 맞게 채워주세요
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbx406y9ZfCV0tlx-V80zo3EPU4OABEVs5FXSDje8Tk6lO6Bcoy2j9IjDmOW7vIyu2eb/exec";
-  const API_TOKEN = "7d8770e7-81fb-472d-8bd2-83672ee0c8e1";
+  const GAS_URL = "여기에_Apps_Script_웹앱_URL";
+  const API_TOKEN = "여기에_setupApiToken_실행결과_토큰";
 
   let map, markers = [], currentData = [];
   let tempMarker = null; // 등록 중 위치 조정용 임시 마커
@@ -372,6 +372,11 @@
     markers = [];
 
     const filtered = getFilteredData();
+    filtered.sort((a, b) => {
+      const aTime = Math.max(new Date(a.updatedDate || 0).getTime() || 0, new Date(a.registeredDate || 0).getTime() || 0);
+      const bTime = Math.max(new Date(b.updatedDate || 0).getTime() || 0, new Date(b.registeredDate || 0).getTime() || 0);
+      return bTime - aTime; // 최근 것이 먼저
+    });
     renderList(filtered);
     document.getElementById('listCount').innerText = filtered.length + '건 (전체 ' + currentData.length + '건)';
 
