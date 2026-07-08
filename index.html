@@ -1,369 +1,519 @@
-// ===== 설정값 =====
-const KAKAO_REST_KEY = "4c2f2d715f20e594f8fdb7eed6ee5049";
-const SHEET_NAME = "Property";
-const COL_FULL지번 = 13; // M열
-const COL_좌표 = 14;     // N열
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>윤프로 매물지도</title>
+<style>
+  html, body { width:100%; height:100%; margin:0; padding:0; font-family: 'Malgun Gothic', sans-serif; overflow: hidden; }
+  .container { display: flex; width: 100%; height: 100%; }
 
-// 주소 하나를 카카오 API로 좌표 변환
-function geocodeAddress(address) {
-  if (!address) return null;
-  const url = "https://dapi.kakao.com/v2/local/search/address.json?query=" 
-              + encodeURIComponent(address);
-  const options = {
-    method: "get",
-    headers: { "Authorization": "KakaoAK " + KAKAO_REST_KEY },
-    muteHttpExceptions: true
-  };
-  const res = UrlFetchApp.fetch(url, options);
-  const json = JSON.parse(res.getContentText());
+  .sidebar { width: 380px; height: 100%; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; background: #fff; z-index: 10; }
+  .sidebar-header { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+  .sidebar-header h2 { margin: 0 0 10px 0; font-size: 17px; color: #333; }
+  .sidebar-header .count { font-size: 12px; color: #888; margin-top:6px; }
+  .btn-new { width:100%; padding:10px; background:#00a844; color:white; border:none; border-radius:6px; font-weight:bold; font-size:13px; cursor:pointer; }
+  .btn-new:hover { background:#009440; }
+  .list-container { flex: 1; overflow-y: auto; }
+  .item-card { padding: 14px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
+  .item-card:hover { background: #f9f9f9; }
+  .item-card .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:3px; background:#eef7ee; color:#00a844; margin-right:6px; }
+  .item-card .title { font-weight: bold; font-size: 14px; color: #222; margin: 4px 0; }
+  .item-card .price { font-size: 13px; color: #00a844; font-weight:bold; }
+  .item-card .addr { font-size: 11px; color: #999; margin-top:2px; }
+  .item-card .customer { font-size: 11px; color: #777; margin-top:2px; }
 
-  if (json.documents && json.documents.length > 0) {
-    const doc = json.documents[0];
-    return doc.y + "," + doc.x; // "위도,경도" 순서
+  .map-area { flex: 1; height: 100%; position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  .confirm-bar { display:none; position:absolute; top:14px; left:50%; transform:translateX(-50%); background:white; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.2); padding:12px 16px; z-index:50; text-align:center; max-width:90%; }
+  .confirm-bar .msg { font-size:13px; color:#333; margin-bottom:8px; }
+  .confirm-bar .btn { padding:6px 14px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:12px; margin:0 4px; }
+  .confirm-bar .btn-go { background:#00a844; color:white; }
+  .confirm-bar .btn-stop { background:#f0f0f0; color:#333; }
+
+  .modal-overlay { display:none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index: 1999; }
+  .modal { display:none; position: fixed; top:50%; left:50%; transform: translate(-50%,-50%); background:white; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.25); z-index:2000; width:420px; max-height:85vh; overflow-y:auto; padding:22px; }
+  .modal h3 { margin-top:0; color:#333; border-bottom:2px solid #00a844; padding-bottom:8px; font-size:16px; }
+  .name-preview { background:#f5f9f5; border:1px dashed #cbe6cb; border-radius:6px; padding:8px 10px; font-size:12px; color:#555; margin-bottom:10px; }
+  .customer-preview { background:#f5f7fb; border:1px dashed #cdd6ea; border-radius:6px; padding:8px 10px; font-size:12px; color:#555; margin-bottom:14px; }
+  .form-group { margin-bottom: 10px; }
+  .form-row { display:flex; gap:8px; }
+  .form-row .form-group { flex:1; }
+  .form-group label { display:block; font-size:11px; color:#777; margin-bottom:3px; }
+  .form-group input, .form-group select, .form-group textarea { width:100%; padding:7px; box-sizing:border-box; border:1px solid #ddd; border-radius:4px; font-size:13px; }
+  .form-group textarea { resize:vertical; min-height:50px; }
+  .section-label { font-size:12px; font-weight:bold; color:#00a844; margin:16px 0 8px; padding-top:10px; border-top:1px solid #f0f0f0; }
+  .conditional-block { display:none; }
+  .btn-area { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .btn { padding:8px 16px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:13px; }
+  .btn-submit { background:#00a844; color:white; }
+  .btn-delete { background:#ff4d4f; color:white; margin-right:auto; }
+  .btn-cancel { background:#f0f0f0; color:#333; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>매물 목록</h2>
+      <button class="btn-new" onclick="startRegister()">+ 신규 매물 등록</button>
+      <div class="count" id="listCount">불러오는 중...</div>
+    </div>
+    <div class="list-container" id="itemList"></div>
+  </div>
+
+  <div class="map-area">
+    <div class="confirm-bar" id="confirmBar">
+      <div class="msg" id="confirmMsg">핀 위치를 확인하세요. 드래그로 위치를 조정할 수 있습니다.</div>
+      <button class="btn btn-go" onclick="proceedToForm()">다음: 정보 입력</button>
+      <button class="btn btn-stop" onclick="cancelRegisterFlow()">취소</button>
+    </div>
+    <div id="map"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal()"></div>
+<div class="modal" id="propertyModal">
+  <h3 id="modalTitle">매물 등록</h3>
+  <div class="name-preview">매물명은 시트 수식으로 자동 생성됩니다. 여기서는 입력하지 않습니다.</div>
+  <div class="customer-preview" id="customerPreview" style="display:none;"></div>
+
+  <input type="hidden" id="form_id">
+  <input type="hidden" id="form_lat">
+  <input type="hidden" id="form_lng">
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>매물유형</label>
+      <select id="form_type" onchange="toggleConditionalFields()">
+        <option value="토지">토지</option>
+        <option value="상가">상가</option>
+        <option value="공장창고">공장창고</option>
+        <option value="주택">주택</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>거래유형</label>
+      <select id="form_dealType" onchange="togglePriceFields()">
+        <option value="매매">매매</option>
+        <option value="보증금월세">보증금/월세</option>
+        <option value="연세">연세</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>매물상태</label>
+    <select id="form_status">
+      <option value="1.광고중">1.광고중</option>
+      <option value="2.진행중">2.진행중</option>
+      <option value="3.계약완료">3.계약완료</option>
+      <option value="4.종료">4.종료</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>소재지 주소</label>
+    <input type="text" id="form_address" placeholder="지번 또는 도로명 주소">
+  </div>
+
+  <div class="form-row price-sale">
+    <div class="form-group"><label>매매가</label><input type="text" id="form_price_sale"></div>
+    <div class="form-group"><label>평단가</label><input type="text" id="form_price_per_pyeong"></div>
+  </div>
+  <div class="form-row price-deposit">
+    <div class="form-group"><label>보증금</label><input type="text" id="form_deposit"></div>
+    <div class="form-group"><label>월세</label><input type="text" id="form_monthly"></div>
+  </div>
+  <div class="form-row price-yearly">
+    <div class="form-group"><label>보증금</label><input type="text" id="form_deposit2"></div>
+    <div class="form-group"><label>연세</label><input type="text" id="form_yearly"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>관리비</label><input type="text" id="form_maintenanceFee"></div>
+    <div class="form-group"><label>관리비포함항목</label><input type="text" id="form_maintenanceFeeItems" placeholder="예: 공용.수도"></div>
+  </div>
+
+  <div class="conditional-block" data-type="토지">
+    <div class="section-label">토지 정보</div>
+    <div class="form-row">
+      <div class="form-group"><label>대지(평)</label><input type="text" id="form_area_land"></div>
+      <div class="form-group"><label>용도지역</label><input type="text" id="form_landZone"></div>
+    </div>
+    <div class="form-group"><label>지구.구역</label><input type="text" id="form_districtZone"></div>
+  </div>
+
+  <div class="conditional-block" data-type="상가">
+    <div class="section-label">상가 정보</div>
+    <div class="form-row">
+      <div class="form-group"><label>공급(평)</label><input type="text" id="form_area_supply_1"></div>
+      <div class="form-group"><label>전용(평)</label><input type="text" id="form_area_exclusive_1"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>권리금</label><input type="text" id="form_premium"></div>
+      <div class="form-group"><label>입점상태</label><input type="text" id="form_occupancyStatus"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>현업종</label><input type="text" id="form_currentBiz"></div>
+      <div class="form-group"><label>추천업종</label><input type="text" id="form_recommendBiz"></div>
+    </div>
+  </div>
+
+  <div class="conditional-block" data-type="공장창고">
+    <div class="section-label">공장창고 정보</div>
+    <div class="form-row">
+      <div class="form-group"><label>대지(평)</label><input type="text" id="form_area_land_2"></div>
+      <div class="form-group"><label>공급/전용(평)</label><input type="text" id="form_area_supply_2"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>사용전력</label><input type="text" id="form_powerSupply"></div>
+      <div class="form-group"><label>층고</label><input type="text" id="form_ceilingHeight"></div>
+    </div>
+  </div>
+
+  <div class="conditional-block" data-type="주택">
+    <div class="section-label">주택 정보</div>
+    <div class="form-row">
+      <div class="form-group"><label>공급(평)</label><input type="text" id="form_area_supply_3"></div>
+      <div class="form-group"><label>전용(평)</label><input type="text" id="form_area_exclusive_3"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>방</label><input type="text" id="form_rooms"></div>
+      <div class="form-group"><label>욕실</label><input type="text" id="form_bathrooms"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>방향</label><input type="text" id="form_direction"></div>
+      <div class="form-group"><label>반려동물</label><input type="text" id="form_pet"></div>
+    </div>
+    <div class="form-group"><label>구조 특징 (복층/다락 등)</label><input type="text" id="form_structureNote"></div>
+  </div>
+
+  <div class="section-label">미디어 &amp; 메모</div>
+  <div class="form-group"><label>NAS 사진링크</label><input type="text" id="form_photoLink"></div>
+  <div class="form-group"><label>NAS 영상링크</label><input type="text" id="form_videoLink"></div>
+  <div class="form-group"><label>블로그 링크</label><input type="text" id="form_blogLink"></div>
+  <div class="form-group"><label>메모</label><textarea id="form_memo"></textarea></div>
+
+  <div class="btn-area">
+    <button class="btn btn-delete" id="btnDelete" onclick="deleteProperty()" style="display:none;">삭제</button>
+    <button class="btn btn-cancel" onclick="closeModal()">취소</button>
+    <button class="btn btn-submit" onclick="saveProperty()">저장</button>
+  </div>
+</div>
+
+<!-- appkey를 본인의 카카오 JavaScript 키로 교체하세요. libraries=services는 주소 검색(지오코딩)에 필요합니다 -->
+<script type="http://text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=3e39f7248f3829204f5bd2ef0cf24e94&libraries=services"></script>
+<script>
+  // 아래 값들을 본인 환경(테스트 시트=map_test_1 기준)에 맞게 채워주세요
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbx406y9ZfCV0tlx-V80zo3EPU4OABEVs5FXSDje8Tk6lO6Bcoy2j9IjDmOW7vIyu2eb/exec";
+  const API_TOKEN = "694f583a-2eca-476e-a198-07312c99cede";
+
+  let map, markers = [], currentData = [];
+  let tempMarker = null; // 등록 중 위치 조정용 임시 마커
+  const geocoder = new kakao.maps.services.Geocoder();
+
+  const container = document.getElementById('map');
+  map = new kakao.maps.Map(container, {
+    center: new kakao.maps.LatLng(33.363503, 126.554480),
+    level: 9
+  });
+
+  function fetchUrl(base) {
+    return base + (base.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(API_TOKEN);
   }
-  return null; // 변환 실패 (주소를 못 찾음)
-}
 
-// 이미 "숫자,숫자" 형태의 진짜 좌표인지 확인
-function isValidCoord(value) {
-  if (!value) return false;
-  return /^-?\d+\.\d+,-?\d+\.\d+$/.test(value.toString().trim());
-}
+  function loadData() {
+    markers.forEach(m => m.setMap(null));
+    markers = [];
 
-// Property 시트 전체를 순회하며 좌표 없는 행만 채우기
-function batchGeocodeAll() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const lastRow = sheet.getLastRow();
-  const startTime = new Date().getTime();
-  const TIME_LIMIT_MS = 4.5 * 60 * 1000; // 4분 30초 (6분 제한 안전마진)
+    fetch(fetchUrl(GAS_URL))
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) { alert(data.error); return; }
+        currentData = data;
+        renderList(data);
+        document.getElementById('listCount').innerText = data.length + '건';
 
-  let processed = 0, success = 0, fail = 0;
+        if (data.length === 0) return;
+        const bounds = new kakao.maps.LatLngBounds();
 
-  for (let row = 2; row <= lastRow; row++) {
-    // 시간 초과 방지: 4분 30초 넘으면 중단, 다음에 이어서 실행
-    if (new Date().getTime() - startTime > TIME_LIMIT_MS) {
-      Logger.log("시간 제한으로 중단. row " + row + "부터 다시 실행하세요.");
-      break;
-    }
-
-    const currentCoord = sheet.getRange(row, COL_좌표).getValue();
-    if (isValidCoord(currentCoord)) continue; // 이미 진짜 좌표면 건너뜀
-
-    const address = sheet.getRange(row, COL_FULL지번).getValue();
-    const coord = geocodeAddress(address);
-    processed++;
-
-    if (coord) {
-      sheet.getRange(row, COL_좌표).setValue(coord);
-      success++;
-    } else {
-      fail++;
-      Logger.log("변환 실패 (row " + row + "): " + address);
-    }
-
-    Utilities.sleep(150); // API 호출 간격 (과부하 방지)
+        data.forEach(item => {
+          const pos = new kakao.maps.LatLng(item.lat, item.lng);
+          const marker = new kakao.maps.Marker({ position: pos, map: map });
+          markers.push(marker);
+          bounds.extend(pos);
+          kakao.maps.event.addListener(marker, 'click', () => openViewModal(item));
+        });
+        map.setBounds(bounds);
+      })
+      .catch(err => alert("데이터 로딩 실패: " + err));
   }
 
-  Logger.log("완료: 처리 " + processed + "건, 성공 " + success + "건, 실패 " + fail + "건");
-}
-
-// ===== 매물 지도용 읽기 API (doGet) v3 =====
-// v2에서 추가된 것: 토큰 검사, Customer 시트 고객명 조인
-// 기존 doGet 함수를 이 코드로 통째로 교체하세요.
-
-function doGet(e) {
-  // ---- 토큰 검사 (URL 뒤에 ?token=xxx 형태로 붙여서 접근해야 함) ----
-  const savedToken = PropertiesService.getScriptProperties().getProperty("API_TOKEN");
-  if (savedToken && (!e.parameter.token || e.parameter.token !== savedToken)) {
-    return ContentService.createTextOutput(JSON.stringify({ error: "인증 실패" }))
-      .setMimeType(ContentService.MimeType.JSON);
+  function formatPrice(item) {
+    if (item.dealType === "매매") return "매매 " + (item.price_sale || "-");
+    if (item.dealType === "연세") return "연세 " + (item.deposit || 0) + "/" + (item.yearly || 0);
+    return "보증금/월세 " + (item.deposit || 0) + "/" + (item.monthly || 0);
   }
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const propSheet = ss.getSheetByName("Property");
-  const custSheet = ss.getSheetByName("Customer");
-
-  const propData = propSheet.getDataRange().getValues();
-  const propHeaders = propData[0];
-  const idx = {};
-  propHeaders.forEach((h, i) => { idx[h] = i; });
-
-  // ---- 고객ID -> 고객명 매핑 만들기 ----
-  const customerMap = {};
-  if (custSheet) {
-    const custData = custSheet.getDataRange().getValues();
-    const custHeaders = custData[0];
-    const custIdx = {};
-    custHeaders.forEach((h, i) => { custIdx[h] = i; });
-
-    // Customer 시트의 ID 컬럼 헤더명이 "고객ID"가 아니라면 아래 줄의 "고객ID"만 수정하세요
-    const custIdCol = custIdx["고객ID"];
-    const custNameCol = custIdx["고객명"];
-
-    if (custIdCol !== undefined && custNameCol !== undefined) {
-      for (let r = 1; r < custData.length; r++) {
-        const cid = custData[r][custIdCol];
-        if (cid) customerMap[cid] = custData[r][custNameCol];
-      }
-    }
-  }
-
-  const results = [];
-
-  for (let r = 1; r < propData.length; r++) {
-    const row = propData[r];
-    const coord = row[idx["좌표"]];
-
-    if (!coord || !/^-?\d+\.\d+,-?\d+\.\d+$/.test(coord.toString().trim())) continue;
-
-    const [lat, lng] = coord.toString().split(",").map(Number);
-    const customerId = row[idx["고객ID"]];
-
-    results.push({
-      id: row[idx["매물ID"]],
-      name: row[idx["매물명"]],
-      type: row[idx["매물유형"]],
-      kind: row[idx["매물종류"]],
-      dealType: row[idx["거래유형"]],
-      status: row[idx["매물상태"]],
-      address: row[idx["소재지"]],
-      lat: lat,
-      lng: lng,
-
-      customerName: customerMap[customerId] || "",
-
-      price_sale: row[idx["매매가"]],
-      price_per_pyeong: row[idx["평단가"]],
-      deposit: row[idx["보증금"]],
-      yearly: row[idx["연세"]],
-      monthly: row[idx["월세"]],
-      maintenanceFee: row[idx["관리비"]],
-      maintenanceFeeItems: row[idx["항목"]],
-      premium: row[idx["권리금"]],
-
-      landZone: row[idx["용도지역"]],
-      districtZone: row[idx["지구.구역"]],
-
-      area_land: row[idx["대지"]],
-      area_supply: row[idx["공급"]],
-      area_exclusive: row[idx["전용"]],
-
-      currentBiz: row[idx["현업종"]],
-      recommendBiz: row[idx["추천업종"]],
-      occupancyStatus: row[idx["입점상태"]],
-
-      powerSupply: row[idx["사용전력"]],
-      ceilingHeight: row[idx["층고"]],
-
-      rooms: row[idx["방"]],
-      bathrooms: row[idx["욕실"]],
-      direction: row[idx["방향"]],
-      pet: row[idx["반려동물"]],
-      structureNote: [row[idx["특수구조"]], row[idx["특수구조(상세)"]], row[idx["특수메모"]]]
-        .filter(v => v).join(" / "),
-
-      buildingUse: row[idx["건축물용도"]],
-      buildingName: row[idx["건물명"]],
-      totalFloorArea: row[idx["연면적"]],
-      buildingUnit: row[idx["해당동"]],
-      floorInfo: row[idx["해당층/총층"]],
-      approvalDate: row[idx["사용승인일"]],
-      households: row[idx["세대수"]],
-      parking: row[idx["주차"]],
-
-      photoLink: row[idx["NAS사진링크"]],
-      videoLink: row[idx["NAS영상링크"]],
-      blogLink: row[idx["블로그"]],
-      memo: row[idx["내용"]]
+  function renderList(data) {
+    const listDiv = document.getElementById('itemList');
+    listDiv.innerHTML = '';
+    data.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `
+        <span class="badge">${item.status || ''}</span>
+        <div class="title">${item.name || '(매물명 생성중)'}</div>
+        <div class="price">${formatPrice(item)}</div>
+        <div class="addr">${item.address || ''}</div>
+        ${item.customerName ? `<div class="customer">고객: ${item.customerName}</div>` : ''}
+      `;
+      card.onclick = () => {
+        map.panTo(new kakao.maps.LatLng(item.lat, item.lng));
+        openViewModal(item);
+      };
+      listDiv.appendChild(card);
     });
   }
 
-  return ContentService.createTextOutput(JSON.stringify(results))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+  // ===== 신규 등록 흐름: 버튼 -> 주소입력 -> 지오코딩 -> 핀 확인/조정 -> 폼 =====
+  function startRegister() {
+    const address = prompt("등록할 매물의 주소를 입력하세요 (지번 또는 도로명 주소)");
+    if (!address) return;
 
-// ===== 매물 지도용 쓰기/수정/삭제 API (doPost) v2 =====
-// 기존 doPost 함수를 이 코드로 통째로 교체하세요.
-//
-// 이번 버전에서 고친 것:
-// 1. 매물명 컬럼은 절대 건드리지 않음 (수식이 깨지지 않도록 보호)
-// 2. 매물ID를 기존 방식(8자리 hex)과 동일하게 생성
-// 3. 신규 등록 시 매물상태 기본값 자동 입력 (비어서 슬라이스/자동화가 안 걸리는 문제 방지)
-// 4. A단계에서 확정한 필드들을 실제로 읽고 쓰도록 매핑 확장
-// 5. 최소한의 보안: 간단한 토큰 검사 추가 (아래 SETUP 함수를 먼저 1회 실행하세요)
-
-// ---- 최초 1회만 실행: API 토큰을 설정합니다 ----
-function setupApiToken() {
-  const token = Utilities.getUuid(); // 무작위 토큰 생성
-  PropertiesService.getScriptProperties().setProperty("API_TOKEN", token);
-  Logger.log("생성된 토큰(지도 웹페이지 JS 코드에 넣으세요): " + token);
-}
-
-function doPost(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Property");
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-
-  const idx = {};
-  headers.forEach((h, i) => { idx[h] = i; });
-
-  const params = JSON.parse(e.postData.contents);
-
-  // ---- 토큰 검사 ----
-  const savedToken = PropertiesService.getScriptProperties().getProperty("API_TOKEN");
-  if (savedToken && params.token !== savedToken) {
-    return jsonOutput({ success: false, message: "인증 실패" });
+    geocoder.addressSearch(address, function (result, status) {
+      if (status !== kakao.maps.services.Status.OK) {
+        alert("주소를 찾을 수 없습니다. 다시 확인해주세요.");
+        return;
+      }
+      const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+      placeTempMarker(coords, address);
+      map.setCenter(coords);
+      map.setLevel(4);
+      document.getElementById('confirmBar').style.display = 'block';
+    });
   }
 
-  const action = params.action;
-
-  if (action === "create") return handleCreate(sheet, headers, idx, params);
-  if (action === "update") return handleUpdate(sheet, data, idx, params);
-  if (action === "delete") return handleDelete(sheet, data, idx, params);
-
-  return jsonOutput({ success: false, message: "알 수 없는 요청입니다." });
-}
-
-// 기존 매물ID와 동일한 8자리 hex 형식으로 생성 (예: 76e1fd7c)
-function generatePropertyId() {
-  return Utilities.getUuid().split("-")[0];
-}
-
-// 값이 있을 때만 셀에 쓰는 헬퍼 (undefined로 기존 값을 지우는 사고 방지)
-function setIfPresent(rowArray, idx, key, value) {
-  if (value !== undefined && value !== null && value !== "") {
-    rowArray[idx[key]] = value;
+  function placeTempMarker(coords, address) {
+    if (tempMarker) tempMarker.setMap(null);
+    tempMarker = new kakao.maps.Marker({ position: coords, map: map, draggable: true });
+    tempMarker.pendingAddress = address;
   }
-}
 
-function handleCreate(sheet, headers, idx, params) {
-  const newId = generatePropertyId();
-  const newRow = new Array(headers.length).fill("");
+  function cancelRegisterFlow() {
+    if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
+    document.getElementById('confirmBar').style.display = 'none';
+  }
 
-  newRow[idx["매물ID"]] = newId;
-  // ⚠️ 매물명은 절대 쓰지 않음 - 수식이 자동으로 채웁니다
+  function proceedToForm() {
+    if (!tempMarker) return;
+    const pos = tempMarker.getPosition();
+    document.getElementById('confirmBar').style.display = 'none';
+    openRegisterModal(pos.getLat(), pos.getLng(), tempMarker.pendingAddress);
+  }
 
-  setIfPresent(newRow, idx, "매물유형", params.type);
-  setIfPresent(newRow, idx, "매물종류", params.kind);
-  setIfPresent(newRow, idx, "거래유형", params.dealType);
-  setIfPresent(newRow, idx, "매물상태", params.status || "1.광고중"); // 기본값 보장
-  setIfPresent(newRow, idx, "소재지", params.address);
-  if (params.lat && params.lng) newRow[idx["좌표"]] = params.lat + "," + params.lng;
-  setIfPresent(newRow, idx, "블로그", params.blogLink);
+  function toggleConditionalFields() {
+    const type = document.getElementById('form_type').value;
+    document.querySelectorAll('.conditional-block').forEach(el => {
+      el.style.display = (el.dataset.type === type) ? 'block' : 'none';
+    });
+  }
 
-  setIfPresent(newRow, idx, "매매가", params.price_sale);
-  setIfPresent(newRow, idx, "평단가", params.price_per_pyeong);
-  setIfPresent(newRow, idx, "보증금", params.deposit);
-  setIfPresent(newRow, idx, "연세", params.yearly);
-  setIfPresent(newRow, idx, "월세", params.monthly);
-  setIfPresent(newRow, idx, "관리비", params.maintenanceFee);
-  setIfPresent(newRow, idx, "항목", params.maintenanceFeeItems);
-  setIfPresent(newRow, idx, "권리금", params.premium);
+  function togglePriceFields() {
+    const dealType = document.getElementById('form_dealType').value;
+    document.querySelector('.price-sale').style.display = (dealType === '매매') ? 'flex' : 'none';
+    document.querySelector('.price-deposit').style.display = (dealType === '보증금월세') ? 'flex' : 'none';
+    document.querySelector('.price-yearly').style.display = (dealType === '연세') ? 'flex' : 'none';
+  }
 
-  setIfPresent(newRow, idx, "용도지역", params.landZone);
-  setIfPresent(newRow, idx, "지구.구역", params.districtZone);
+  function resetForm() {
+    document.querySelectorAll('.modal input, .modal textarea').forEach(el => el.value = '');
+    document.getElementById('form_type').value = '토지';
+    document.getElementById('form_dealType').value = '매매';
+    document.getElementById('form_status').value = '1.광고중';
+    document.getElementById('customerPreview').style.display = 'none';
+    toggleConditionalFields();
+    togglePriceFields();
+  }
 
-  setIfPresent(newRow, idx, "대지", params.area_land);
-  setIfPresent(newRow, idx, "공급", params.area_supply);
-  setIfPresent(newRow, idx, "전용", params.area_exclusive);
+  function openRegisterModal(lat, lng, address) {
+    resetForm();
+    document.getElementById('modalTitle').innerText = "신규 매물 등록";
+    document.getElementById('form_id').value = "";
+    document.getElementById('form_lat').value = lat;
+    document.getElementById('form_lng').value = lng;
+    document.getElementById('form_address').value = address || "";
+    document.getElementById('btnDelete').style.display = "none";
+    showModal();
+  }
 
-  setIfPresent(newRow, idx, "현업종", params.currentBiz);
-  setIfPresent(newRow, idx, "추천업종", params.recommendBiz);
-  setIfPresent(newRow, idx, "입점상태", params.occupancyStatus);
+  function openViewModal(item) {
+    resetForm();
+    document.getElementById('modalTitle').innerText = "매물 수정 (" + item.id + ")";
+    document.getElementById('form_id').value = item.id;
+    document.getElementById('form_lat').value = item.lat;
+    document.getElementById('form_lng').value = item.lng;
 
-  setIfPresent(newRow, idx, "사용전력", params.powerSupply);
-  setIfPresent(newRow, idx, "층고", params.ceilingHeight);
+    document.getElementById('form_type').value = item.type || '토지';
+    document.getElementById('form_dealType').value = item.dealType || '매매';
+    document.getElementById('form_status').value = item.status || '1.광고중';
+    document.getElementById('form_address').value = item.address || '';
 
-  setIfPresent(newRow, idx, "방", params.rooms);
-  setIfPresent(newRow, idx, "욕실", params.bathrooms);
-  setIfPresent(newRow, idx, "방향", params.direction);
-  setIfPresent(newRow, idx, "반려동물", params.pet);
-  setIfPresent(newRow, idx, "특수메모", params.structureNote); // 통합 입력은 특수메모에 저장
-
-  setIfPresent(newRow, idx, "건축물용도", params.buildingUse);
-  setIfPresent(newRow, idx, "건물명", params.buildingName);
-  setIfPresent(newRow, idx, "연면적", params.totalFloorArea);
-  setIfPresent(newRow, idx, "해당동", params.buildingUnit);
-  setIfPresent(newRow, idx, "해당층/총층", params.floorInfo);
-  setIfPresent(newRow, idx, "사용승인일", params.approvalDate);
-  setIfPresent(newRow, idx, "세대수", params.households);
-  setIfPresent(newRow, idx, "주차", params.parking);
-
-  setIfPresent(newRow, idx, "NAS사진링크", params.photoLink);
-  setIfPresent(newRow, idx, "NAS영상링크", params.videoLink);
-  setIfPresent(newRow, idx, "내용", params.memo);
-
-  newRow[idx["등록일"]] = new Date();
-
-  sheet.appendRow(newRow);
-  return jsonOutput({ success: true, message: "매물이 등록되었습니다.", id: newId });
-}
-
-function handleUpdate(sheet, data, idx, params) {
-  const targetId = params.id;
-  let targetRow = -1;
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][idx["매물ID"]] == targetId) {
-      targetRow = i + 1; // 시트 행 번호 (1-based, 헤더 포함)
-      break;
+    if (item.customerName) {
+      document.getElementById('customerPreview').style.display = 'block';
+      document.getElementById('customerPreview').innerText = '연결된 고객: ' + item.customerName;
     }
+
+    document.getElementById('form_price_sale').value = item.price_sale || '';
+    document.getElementById('form_price_per_pyeong').value = item.price_per_pyeong || '';
+    document.getElementById('form_deposit').value = item.deposit || '';
+    document.getElementById('form_monthly').value = item.monthly || '';
+    document.getElementById('form_deposit2').value = item.deposit || '';
+    document.getElementById('form_yearly').value = item.yearly || '';
+    document.getElementById('form_maintenanceFee').value = item.maintenanceFee || '';
+    document.getElementById('form_maintenanceFeeItems').value = item.maintenanceFeeItems || '';
+
+    document.getElementById('form_area_land').value = item.area_land || '';
+    document.getElementById('form_landZone').value = item.landZone || '';
+    document.getElementById('form_districtZone').value = item.districtZone || '';
+
+    document.getElementById('form_area_supply_1').value = item.area_supply || '';
+    document.getElementById('form_area_exclusive_1').value = item.area_exclusive || '';
+    document.getElementById('form_premium').value = item.premium || '';
+    document.getElementById('form_occupancyStatus').value = item.occupancyStatus || '';
+    document.getElementById('form_currentBiz').value = item.currentBiz || '';
+    document.getElementById('form_recommendBiz').value = item.recommendBiz || '';
+
+    document.getElementById('form_area_land_2').value = item.area_land || '';
+    document.getElementById('form_area_supply_2').value = item.area_supply || '';
+    document.getElementById('form_powerSupply').value = item.powerSupply || '';
+    document.getElementById('form_ceilingHeight').value = item.ceilingHeight || '';
+
+    document.getElementById('form_area_supply_3').value = item.area_supply || '';
+    document.getElementById('form_area_exclusive_3').value = item.area_exclusive || '';
+    document.getElementById('form_rooms').value = item.rooms || '';
+    document.getElementById('form_bathrooms').value = item.bathrooms || '';
+    document.getElementById('form_direction').value = item.direction || '';
+    document.getElementById('form_pet').value = item.pet || '';
+    document.getElementById('form_structureNote').value = item.structureNote || '';
+
+    document.getElementById('form_photoLink').value = item.photoLink || '';
+    document.getElementById('form_videoLink').value = item.videoLink || '';
+    document.getElementById('form_blogLink').value = item.blogLink || '';
+    document.getElementById('form_memo').value = item.memo || '';
+
+    toggleConditionalFields();
+    togglePriceFields();
+    document.getElementById('btnDelete').style.display = "inline-block";
+    showModal();
   }
 
-  if (targetRow === -1) {
-    return jsonOutput({ success: false, message: "해당 매물ID를 찾을 수 없습니다." });
+  function showModal() {
+    document.getElementById('propertyModal').style.display = "block";
+    document.getElementById('modalOverlay').style.display = "block";
+  }
+  function closeModal() {
+    document.getElementById('propertyModal').style.display = "none";
+    document.getElementById('modalOverlay').style.display = "none";
+    if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
   }
 
-  // 쓰기 가능 필드 목록 - "매물명"은 절대 포함하지 않음
-  const writableFields = {
-    type: "매물유형", kind: "매물종류", dealType: "거래유형", status: "매물상태",
-    address: "소재지", blogLink: "블로그",
-    price_sale: "매매가", price_per_pyeong: "평단가", deposit: "보증금",
-    yearly: "연세", monthly: "월세", maintenanceFee: "관리비",
-    maintenanceFeeItems: "항목", premium: "권리금",
-    landZone: "용도지역", districtZone: "지구.구역",
-    area_land: "대지", area_supply: "공급", area_exclusive: "전용",
-    currentBiz: "현업종", recommendBiz: "추천업종", occupancyStatus: "입점상태",
-    powerSupply: "사용전력", ceilingHeight: "층고",
-    rooms: "방", bathrooms: "욕실", direction: "방향", pet: "반려동물",
-    structureNote: "특수메모",
-    buildingUse: "건축물용도", buildingName: "건물명", totalFloorArea: "연면적",
-    buildingUnit: "해당동", floorInfo: "해당층/총층", approvalDate: "사용승인일",
-    households: "세대수", parking: "주차",
-    photoLink: "NAS사진링크", videoLink: "NAS영상링크", memo: "내용"
-  };
+  function collectPayload() {
+    const type = document.getElementById('form_type').value;
+    const dealType = document.getElementById('form_dealType').value;
 
-  for (const key in writableFields) {
-    if (params[key] !== undefined && params[key] !== "") {
-      sheet.getRange(targetRow, idx[writableFields[key]] + 1).setValue(params[key]);
+    const payload = {
+      token: API_TOKEN,
+      id: document.getElementById('form_id').value,
+      lat: document.getElementById('form_lat').value,
+      lng: document.getElementById('form_lng').value,
+      type: type,
+      dealType: dealType,
+      status: document.getElementById('form_status').value,
+      address: document.getElementById('form_address').value,
+      maintenanceFee: document.getElementById('form_maintenanceFee').value,
+      maintenanceFeeItems: document.getElementById('form_maintenanceFeeItems').value,
+      photoLink: document.getElementById('form_photoLink').value,
+      videoLink: document.getElementById('form_videoLink').value,
+      blogLink: document.getElementById('form_blogLink').value,
+      memo: document.getElementById('form_memo').value
+    };
+
+    if (dealType === '매매') {
+      payload.price_sale = document.getElementById('form_price_sale').value;
+      payload.price_per_pyeong = document.getElementById('form_price_per_pyeong').value;
+    } else if (dealType === '보증금월세') {
+      payload.deposit = document.getElementById('form_deposit').value;
+      payload.monthly = document.getElementById('form_monthly').value;
+    } else if (dealType === '연세') {
+      payload.deposit = document.getElementById('form_deposit2').value;
+      payload.yearly = document.getElementById('form_yearly').value;
     }
-  }
 
-  if (params.lat && params.lng) {
-    sheet.getRange(targetRow, idx["좌표"] + 1).setValue(params.lat + "," + params.lng);
-  }
-
-  sheet.getRange(targetRow, idx["확인일"] + 1).setValue(new Date());
-
-  return jsonOutput({ success: true, message: "매물 정보가 수정되었습니다." });
-}
-
-function handleDelete(sheet, data, idx, params) {
-  const targetId = params.id;
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][idx["매물ID"]] == targetId) {
-      // 완전 삭제 대신 상태만 변경하는 것을 권장하지만,
-      // 지도 앱에서의 "삭제" 버튼은 실제 행 삭제로 구현 (요청하신 대로)
-      sheet.deleteRow(i + 1);
-      return jsonOutput({ success: true, message: "매물이 삭제되었습니다." });
+    if (type === '토지') {
+      payload.area_land = document.getElementById('form_area_land').value;
+      payload.landZone = document.getElementById('form_landZone').value;
+      payload.districtZone = document.getElementById('form_districtZone').value;
+    } else if (type === '상가') {
+      payload.area_supply = document.getElementById('form_area_supply_1').value;
+      payload.area_exclusive = document.getElementById('form_area_exclusive_1').value;
+      payload.premium = document.getElementById('form_premium').value;
+      payload.occupancyStatus = document.getElementById('form_occupancyStatus').value;
+      payload.currentBiz = document.getElementById('form_currentBiz').value;
+      payload.recommendBiz = document.getElementById('form_recommendBiz').value;
+    } else if (type === '공장창고') {
+      payload.area_land = document.getElementById('form_area_land_2').value;
+      payload.area_supply = document.getElementById('form_area_supply_2').value;
+      payload.powerSupply = document.getElementById('form_powerSupply').value;
+      payload.ceilingHeight = document.getElementById('form_ceilingHeight').value;
+    } else if (type === '주택') {
+      payload.area_supply = document.getElementById('form_area_supply_3').value;
+      payload.area_exclusive = document.getElementById('form_area_exclusive_3').value;
+      payload.rooms = document.getElementById('form_rooms').value;
+      payload.bathrooms = document.getElementById('form_bathrooms').value;
+      payload.direction = document.getElementById('form_direction').value;
+      payload.pet = document.getElementById('form_pet').value;
+      payload.structureNote = document.getElementById('form_structureNote').value;
     }
+
+    return payload;
   }
 
-  return jsonOutput({ success: false, message: "해당 매물ID를 찾을 수 없습니다." });
-}
+  function saveProperty() {
+    const payload = collectPayload();
+    payload.action = payload.id ? "update" : "create";
 
-function jsonOutput(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+    if (!payload.address) { alert("소재지 주소를 입력해주세요."); return; }
+
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(res => {
+        alert(res.message);
+        if (res.success) {
+          if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
+          closeModal();
+          loadData();
+        }
+      })
+      .catch(err => alert("전송 실패: " + err));
+  }
+
+  function deleteProperty() {
+    if (!confirm("정말 이 매물을 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
+    const payload = { token: API_TOKEN, action: "delete", id: document.getElementById('form_id').value };
+
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(res => {
+        alert(res.message);
+        if (res.success) { closeModal(); loadData(); }
+      })
+      .catch(err => alert("삭제 실패: " + err));
+  }
+
+  window.onload = loadData;
+</script>
+</body>
+</html>
