@@ -92,6 +92,14 @@
           <option value="주택">주택</option>
         </select>
       </div>
+      <div class="filter-row">
+        <input type="text" id="filterAddress" placeholder="소재지 검색 (예: 남원읍)" oninput="applyFilters()" style="flex:1; padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+      </div>
+      <div class="filter-row">
+        <input type="number" id="filterMinPrice" placeholder="최소금액" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+        <span style="align-self:center; font-size:11px; color:#999;">~</span>
+        <input type="number" id="filterMaxPrice" placeholder="최대금액" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+      </div>
       <div class="count" id="listCount">불러오는 중...</div>
     </div>
     <div class="list-container" id="itemList"></div>
@@ -280,15 +288,40 @@
       .catch(err => alert("데이터 로딩 실패: " + err));
   }
 
+  function parseNum(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = parseFloat(v.toString().replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? null : n;
+  }
+
+  function itemPrimaryPrice(item) {
+    const group = priceGroup(item.dealType);
+    if (group === 'sale') return parseNum(item.price_sale);
+    if (group === 'jeonse') return parseNum(item.deposit);
+    if (group === 'yearly') return parseNum(item.yearly);
+    return parseNum(item.monthly);
+  }
+
   function getFilteredData() {
     const status = document.getElementById('filterStatus').value;
     const dealType = document.getElementById('filterDealType').value;
     const type = document.getElementById('filterType').value;
+    const addressKeyword = document.getElementById('filterAddress').value.trim();
+    const minPrice = parseNum(document.getElementById('filterMinPrice').value);
+    const maxPrice = parseNum(document.getElementById('filterMaxPrice').value);
 
     return currentData.filter(item => {
       if (status && item.status !== status) return false;
       if (dealType && item.dealType !== dealType) return false;
       if (type && item.type !== type) return false;
+      if (addressKeyword && !(item.address || '').includes(addressKeyword)) return false;
+
+      if (minPrice !== null || maxPrice !== null) {
+        const p = itemPrimaryPrice(item);
+        if (p === null) return false; // 금액 정보 없는 매물은 범위 필터 걸면 제외
+        if (minPrice !== null && p < minPrice) return false;
+        if (maxPrice !== null && p > maxPrice) return false;
+      }
       return true;
     });
   }
