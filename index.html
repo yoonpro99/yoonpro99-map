@@ -65,15 +65,24 @@
         <select id="filterStatus" onchange="applyFilters()">
           <option value="">상태: 전체</option>
           <option value="1.광고중" selected>1.광고중</option>
-          <option value="2.진행중">2.진행중</option>
-          <option value="3.계약완료">3.계약완료</option>
-          <option value="4.종료">4.종료</option>
+          <option value="2.문의중">2.문의중</option>
+          <option value="3.협의중">3.협의중</option>
+          <option value="4.계약완료">4.계약완료</option>
+          <option value="5.보류">5.보류</option>
+          <option value="6.종료">6.종료</option>
         </select>
         <select id="filterDealType" onchange="applyFilters()">
           <option value="">거래: 전체</option>
-          <option value="매매">매매</option>
-          <option value="보증금월세">보증금/월세</option>
-          <option value="연세">연세</option>
+          <option value="매도">매도</option>
+          <option value="매수">매수</option>
+          <option value="임대 전세">임대 전세</option>
+          <option value="임대 연세">임대 연세</option>
+          <option value="임대 월세">임대 월세</option>
+          <option value="임대 단기">임대 단기</option>
+          <option value="임차 전세">임차 전세</option>
+          <option value="임차 연세">임차 연세</option>
+          <option value="임차 월세">임차 월세</option>
+          <option value="임차 단기">임차 단기</option>
         </select>
         <select id="filterType" onchange="applyFilters()">
           <option value="">유형: 전체</option>
@@ -121,9 +130,16 @@
     <div class="form-group">
       <label>거래유형</label>
       <select id="form_dealType" onchange="togglePriceFields()">
-        <option value="매매">매매</option>
-        <option value="보증금월세">보증금/월세</option>
-        <option value="연세">연세</option>
+        <option value="매도">매도</option>
+        <option value="매수">매수</option>
+        <option value="임대 전세">임대 전세</option>
+        <option value="임대 연세">임대 연세</option>
+        <option value="임대 월세">임대 월세</option>
+        <option value="임대 단기">임대 단기</option>
+        <option value="임차 전세">임차 전세</option>
+        <option value="임차 연세">임차 연세</option>
+        <option value="임차 월세">임차 월세</option>
+        <option value="임차 단기">임차 단기</option>
       </select>
     </div>
   </div>
@@ -132,9 +148,11 @@
     <label>매물상태</label>
     <select id="form_status">
       <option value="1.광고중">1.광고중</option>
-      <option value="2.진행중">2.진행중</option>
-      <option value="3.계약완료">3.계약완료</option>
-      <option value="4.종료">4.종료</option>
+      <option value="2.문의중">2.문의중</option>
+      <option value="3.협의중">3.협의중</option>
+      <option value="4.계약완료">4.계약완료</option>
+      <option value="5.보류">5.보류</option>
+      <option value="6.종료">6.종료</option>
     </select>
   </div>
 
@@ -147,13 +165,16 @@
     <div class="form-group"><label>매매가</label><input type="text" id="form_price_sale"></div>
     <div class="form-group"><label>평단가</label><input type="text" id="form_price_per_pyeong"></div>
   </div>
-  <div class="form-row price-deposit">
-    <div class="form-group"><label>보증금</label><input type="text" id="form_deposit"></div>
-    <div class="form-group"><label>월세</label><input type="text" id="form_monthly"></div>
+  <div class="form-row price-jeonse">
+    <div class="form-group"><label>보증금(전세)</label><input type="text" id="form_deposit_jeonse"></div>
   </div>
   <div class="form-row price-yearly">
-    <div class="form-group"><label>보증금</label><input type="text" id="form_deposit2"></div>
+    <div class="form-group"><label>보증금</label><input type="text" id="form_deposit_yearly"></div>
     <div class="form-group"><label>연세</label><input type="text" id="form_yearly"></div>
+  </div>
+  <div class="form-row price-monthly">
+    <div class="form-group"><label>보증금</label><input type="text" id="form_deposit_monthly"></div>
+    <div class="form-group"><label>월세</label><input type="text" id="form_monthly"></div>
   </div>
   <div class="form-row">
     <div class="form-group"><label>관리비</label><input type="text" id="form_maintenanceFee"></div>
@@ -295,9 +316,11 @@
   }
 
   function formatPrice(item) {
-    if (item.dealType === "매매") return "매매 " + (item.price_sale || "-");
-    if (item.dealType === "연세") return "연세 " + (item.deposit || 0) + "/" + (item.yearly || 0);
-    return "보증금/월세 " + (item.deposit || 0) + "/" + (item.monthly || 0);
+    const group = priceGroup(item.dealType);
+    if (group === 'sale') return (item.dealType || '') + ' ' + (item.price_sale || '-');
+    if (group === 'jeonse') return (item.dealType || '') + ' ' + (item.deposit || 0);
+    if (group === 'yearly') return (item.dealType || '') + ' ' + (item.deposit || 0) + '/' + (item.yearly || 0);
+    return (item.dealType || '') + ' ' + (item.deposit || 0) + '/' + (item.monthly || 0);
   }
 
   function renderList(data) {
@@ -364,17 +387,25 @@
     });
   }
 
+  function priceGroup(dealType) {
+    if (dealType === '매도' || dealType === '매수') return 'sale';
+    if (dealType === '임대 전세' || dealType === '임차 전세') return 'jeonse';
+    if (dealType === '임대 연세' || dealType === '임차 연세') return 'yearly';
+    return 'monthly'; // 임대/임차 월세, 단기
+  }
+
   function togglePriceFields() {
-    const dealType = document.getElementById('form_dealType').value;
-    document.querySelector('.price-sale').style.display = (dealType === '매매') ? 'flex' : 'none';
-    document.querySelector('.price-deposit').style.display = (dealType === '보증금월세') ? 'flex' : 'none';
-    document.querySelector('.price-yearly').style.display = (dealType === '연세') ? 'flex' : 'none';
+    const group = priceGroup(document.getElementById('form_dealType').value);
+    document.querySelector('.price-sale').style.display = (group === 'sale') ? 'flex' : 'none';
+    document.querySelector('.price-jeonse').style.display = (group === 'jeonse') ? 'flex' : 'none';
+    document.querySelector('.price-yearly').style.display = (group === 'yearly') ? 'flex' : 'none';
+    document.querySelector('.price-monthly').style.display = (group === 'monthly') ? 'flex' : 'none';
   }
 
   function resetForm() {
     document.querySelectorAll('.modal input, .modal textarea').forEach(el => el.value = '');
     document.getElementById('form_type').value = '토지';
-    document.getElementById('form_dealType').value = '매매';
+    document.getElementById('form_dealType').value = '매도';
     document.getElementById('form_status').value = '1.광고중';
     document.getElementById('customerPreview').style.display = 'none';
     toggleConditionalFields();
@@ -411,10 +442,11 @@
 
     document.getElementById('form_price_sale').value = item.price_sale || '';
     document.getElementById('form_price_per_pyeong').value = item.price_per_pyeong || '';
-    document.getElementById('form_deposit').value = item.deposit || '';
-    document.getElementById('form_monthly').value = item.monthly || '';
-    document.getElementById('form_deposit2').value = item.deposit || '';
+    document.getElementById('form_deposit_jeonse').value = item.deposit || '';
+    document.getElementById('form_deposit_yearly').value = item.deposit || '';
     document.getElementById('form_yearly').value = item.yearly || '';
+    document.getElementById('form_deposit_monthly').value = item.deposit || '';
+    document.getElementById('form_monthly').value = item.monthly || '';
     document.getElementById('form_maintenanceFee').value = item.maintenanceFee || '';
     document.getElementById('form_maintenanceFeeItems').value = item.maintenanceFeeItems || '';
 
@@ -484,15 +516,18 @@
       memo: document.getElementById('form_memo').value
     };
 
-    if (dealType === '매매') {
+    const group = priceGroup(dealType);
+    if (group === 'sale') {
       payload.price_sale = document.getElementById('form_price_sale').value;
       payload.price_per_pyeong = document.getElementById('form_price_per_pyeong').value;
-    } else if (dealType === '보증금월세') {
-      payload.deposit = document.getElementById('form_deposit').value;
-      payload.monthly = document.getElementById('form_monthly').value;
-    } else if (dealType === '연세') {
-      payload.deposit = document.getElementById('form_deposit2').value;
+    } else if (group === 'jeonse') {
+      payload.deposit = document.getElementById('form_deposit_jeonse').value;
+    } else if (group === 'yearly') {
+      payload.deposit = document.getElementById('form_deposit_yearly').value;
       payload.yearly = document.getElementById('form_yearly').value;
+    } else {
+      payload.deposit = document.getElementById('form_deposit_monthly').value;
+      payload.monthly = document.getElementById('form_monthly').value;
     }
 
     if (type === '토지') {
