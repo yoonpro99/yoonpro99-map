@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>윤프로 매물지도</title>
+<style>
+  html, body { width:100%; height:100%; margin:0; padding:0; font-family: 'Malgun Gothic', sans-serif; overflow: hidden; }
+  .container { display: flex; width: 100%; height: 100%; }
+
+  .sidebar { width: 380px; height: 100%; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; background: #fff; z-index: 10; }
+  .sidebar-header { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+  .sidebar-header h2 { margin: 0 0 4px 0; font-size: 17px; color: #333; }
+  .sidebar-header .count { font-size: 12px; color: #888; }
+  .list-container { flex: 1; overflow-y: auto; }
+  .item-card { padding: 14px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
+  .item-card:hover { background: #f9f9f9; }
+  .item-card .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:3px; background:#eef7ee; color:#00a844; margin-right:6px; }
+  .item-card .title { font-weight: bold; font-size: 14px; color: #222; margin: 4px 0; }
+  .item-card .price { font-size: 13px; color: #00a844; font-weight:bold; }
+  .item-card .addr { font-size: 11px; color: #999; margin-top:2px; }
+
+  .map-area { flex: 1; height: 100%; position: relative; }
+  #map { width: 100%; height: 100%; }
+  .map-tip { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 15; pointer-events: none; }
+
+  .modal-overlay { display:none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index: 1999; }
+  .modal { display:none; position: fixed; top:50%; left:50%; transform: translate(-50%,-50%); background:white; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.25); z-index:2000; width:420px; max-height:85vh; overflow-y:auto; padding:22px; }
+  .modal h3 { margin-top:0; color:#333; border-bottom:2px solid #00a844; padding-bottom:8px; font-size:16px; }
+  .name-preview { background:#f5f9f5; border:1px dashed #cbe6cb; border-radius:6px; padding:8px 10px; font-size:12px; color:#555; margin-bottom:14px; }
+  .form-group { margin-bottom: 10px; }
+  .form-row { display:flex; gap:8px; }
+  .form-row .form-group { flex:1; }
+  .form-group label { display:block; font-size:11px; color:#777; margin-bottom:3px; }
+  .form-group input, .form-group select, .form-group textarea { width:100%; padding:7px; box-sizing:border-box; border:1px solid #ddd; border-radius:4px; font-size:13px; }
+  .form-group textarea { resize:vertical; min-height:50px; }
+  .section-label { font-size:12px; font-weight:bold; color:#00a844; margin:16px 0 8px; padding-top:10px; border-top:1px solid #f0f0f0; }
+  .conditional-block { display:none; }
+  .btn-area { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .btn { padding:8px 16px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:13px; }
+  .btn-submit { background:#00a844; color:white; }
+  .btn-delete { background:#ff4d4f; color:white; margin-right:auto; }
+  .btn-cancel { background:#f0f0f0; color:#333; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>매물 목록</h2>
+      <div class="count" id="listCount">불러오는 중...</div>
+    </div>
+    <div class="list-container" id="itemList"></div>
+  </div>
+
+  <div class="map-area">
+    <div class="map-tip">지도 빈 곳을 클릭하면 그 위치에 신규 매물을 등록합니다.</div>
+    <div id="map"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal()"></div>
+<div class="modal" id="propertyModal">
+  <h3 id="modalTitle">매물 등록</h3>
+  <div class="name-preview">매물명은 시트 수식으로 자동 생성됩니다. 여기서는 입력하지 않습니다.</div>
+
+  <input type="hidden" id="form_id">
+  <input type="hidden" id="form_lat">
+  <input type="hidden" id="form_lng">
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>매물유형</label>
+      <select id="form_type" onchange="toggleConditionalFields()">
+        <option value="토지">토지</option>
+        <option value="상가">상가</option>
+        <option value="공장창고">공장창고</option>
+        <option value="주택">주택</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>거래유형</label>
+      <select id="form_dealType" onchange="togglePriceFields()">
+        <option value="매매">매매</option>
+        <option value="보증금월세">보증금/월세</option>
+        <option value="연세">연세</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>매물상태</label>
+    <select id="form_status">
+      <option value="1.광고중">1.광고중</option>
+      <option value="2.진행중">2.진행중</option>
+      <option value="3.계약완료">3.계약완료</option>
+      <option value="4.종료">4.종료</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>소재지 주소</label>
+    <input type="text" id="form_address" placeholder="지번 또는 도로명 주소">
+  </div>
+
+  <div class="form-row price-sale">
+    <div class="form-group"><label>매매가</label><input type="text" id="form_price_sale"></div>
+    <div class="form-group"><label>평단가</label><input type="text" id="form_price_per_pyeong"></div>
+  </div>
+  <div class="form-row price-deposit">
+    <div class="form-group"><label>보증금</label><input type="text" id="form_deposit"></div>
+    <div class="form-group"><label>월세</label><input type="text" id="form_monthly"></div>
+  </div>
+  <div class="form-row price-yearly">
+    <div class="form-group"><label>보증금</label><input type="text" id="form_deposit2"></div>
+    <div class="form-group"><label>연세</label><input type="text" id="form_yearly"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>관리비</label><input type="text" id="form_maintenanceFee"></div>
+    <div class="form-group"><label>관리비포함항목</label><input type="text" id="form_maintenanceFeeItems" placeholder="예: 공용.수도"></div>
+  </div>
+
+  <div class="conditional-block" data-type="토지">
+    <div class="section-label">토지 정보</div>
+    <div class="form-row">
+      <div class="form-group"><label>대지(평)</label><input type="text" id="form_area_land"></div>
+      <div class="form-group"><label>용도지역</label><input type="text" id="form_landZone"></div>
+    </div>
+    <div class="form-group"><label>지구.구역</label><input type="text" id="form_districtZone"></div>
+  </div>
+
+  <div class="conditional-block" data-type="상가">
+    <div class="section-label">상가 정보</div>
+    <div class="form-row">
+      <div class="form-group"><label>공급(평)</label><input type="text" id="form_area_supply_1"></div>
+      <div class="form-group"><label>전용(평)</label><input type="text" id="form_area_exclusive_1"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>권리금</label><input type="text" id="form_premium"></div>
+      <div class="form-group"><label>입점상태</label><input type="text" id="form_occupancyStatus"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>현업종</label><input type="text" id="form_currentBiz"></div>
+      <div class="form-group"><label>추천업종</label><input type="text" id="form_recommendBiz"></div>
+    </div>
+  </div>
+
+  <div class="conditional-block" data-type="공장창고">
+    <div class="section-label">공장창고 정보</div>
+    <div class="form-row">
+      <div class="form-group"><label>대지(평)</label><input type="text" id="form_area_land_2"></div>
+      <div class="form-group"><label>공급/전용(평)</label><input type="text" id="form_area_supply_2"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>사용전력</label><input type="text" id="form_powerSupply"></div>
+      <div class="form-group"><label>층고</label><input type="text" id="form_ceilingHeight"></div>
+    </div>
+  </div>
+
+  <div class="conditional-block" data-type="주택">
+    <div class="section-label">주택 정보</div>
+    <div class="form-row">
+      <div class="form-group"><label>공급(평)</label><input type="text" id="form_area_supply_3"></div>
+      <div class="form-group"><label>전용(평)</label><input type="text" id="form_area_exclusive_3"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>방</label><input type="text" id="form_rooms"></div>
+      <div class="form-group"><label>욕실</label><input type="text" id="form_bathrooms"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>방향</label><input type="text" id="form_direction"></div>
+      <div class="form-group"><label>반려동물</label><input type="text" id="form_pet"></div>
+    </div>
+    <div class="form-group"><label>구조 특징 (복층/다락 등)</label><input type="text" id="form_structureNote"></div>
+  </div>
+
+  <div class="section-label">미디어 &amp; 메모</div>
+  <div class="form-group"><label>NAS 사진링크</label><input type="text" id="form_photoLink"></div>
+  <div class="form-group"><label>NAS 영상링크</label><input type="text" id="form_videoLink"></div>
+  <div class="form-group"><label>블로그 링크</label><input type="text" id="form_blogLink"></div>
+  <div class="form-group"><label>메모</label><textarea id="form_memo"></textarea></div>
+
+  <div class="btn-area">
+    <button class="btn btn-delete" id="btnDelete" onclick="deleteProperty()" style="display:none;">삭제</button>
+    <button class="btn btn-cancel" onclick="closeModal()">취소</button>
+    <button class="btn btn-submit" onclick="saveProperty()">저장</button>
+  </div>
+</div>
+
+<!-- appkey를 본인의 카카오 JavaScript 키로 교체하세요 -->
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=3e39f7248f3829204f5bd2ef0cf24e94"></script>
+<script>
+  // 아래 두 값을 본인 환경에 맞게 채워주세요
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwfRV8fNnP9G-7KaVJz22nJK_bGQ1vNZdCNoWkkFoj6F9h0scGu07tVIQiC60HgbKfv/exec";
+  const API_TOKEN = "62f7f30b-bb71-4a6f-83ff-2a5a5c223726";
+
+  let map, markers = [], currentData = [];
+
+  const container = document.getElementById('map');
+  map = new kakao.maps.Map(container, {
+    center: new kakao.maps.LatLng(33.363503, 126.554480),
+    level: 9
+  });
+
+  kakao.maps.event.addListener(map, 'click', function (mouseEvent) {
+    const latlng = mouseEvent.latLng;
+    openRegisterModal(latlng.getLat(), latlng.getLng());
+  });
+
+  function loadData() {
+    markers.forEach(m => m.setMap(null));
+    markers = [];
+
+    fetch(GAS_URL)
+      .then(res => res.json())
+      .then(data => {
+        currentData = data;
+        renderList(data);
+        document.getElementById('listCount').innerText = data.length + '건';
+
+        if (data.length === 0) return;
+        const bounds = new kakao.maps.LatLngBounds();
+
+        data.forEach(item => {
+          const pos = new kakao.maps.LatLng(item.lat, item.lng);
+          const marker = new kakao.maps.Marker({ position: pos, map: map });
+          markers.push(marker);
+          bounds.extend(pos);
+          kakao.maps.event.addListener(marker, 'click', () => openViewModal(item));
+        });
+        map.setBounds(bounds);
+      })
+      .catch(err => alert("데이터 로딩 실패: " + err));
+  }
+
+  function formatPrice(item) {
+    if (item.dealType === "매매") return "매매 " + (item.price_sale || "-");
+    if (item.dealType === "연세") return "연세 " + (item.deposit || 0) + "/" + (item.yearly || 0);
+    return "보증금/월세 " + (item.deposit || 0) + "/" + (item.monthly || 0);
+  }
+
+  function renderList(data) {
+    const listDiv = document.getElementById('itemList');
+    listDiv.innerHTML = '';
+    data.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `
+        <span class="badge">${item.status || ''}</span>
+        <div class="title">${item.name || '(매물명 생성중)'}</div>
+        <div class="price">${formatPrice(item)}</div>
+        <div class="addr">${item.address || ''}</div>
+      `;
+      card.onclick = () => {
+        map.panTo(new kakao.maps.LatLng(item.lat, item.lng));
+        openViewModal(item);
+      };
+      listDiv.appendChild(card);
+    });
+  }
+
+  function toggleConditionalFields() {
+    const type = document.getElementById('form_type').value;
+    document.querySelectorAll('.conditional-block').forEach(el => {
+      el.style.display = (el.dataset.type === type) ? 'block' : 'none';
+    });
+  }
+
+  function togglePriceFields() {
+    const dealType = document.getElementById('form_dealType').value;
+    document.querySelector('.price-sale').style.display = (dealType === '매매') ? 'flex' : 'none';
+    document.querySelector('.price-deposit').style.display = (dealType === '보증금월세') ? 'flex' : 'none';
+    document.querySelector('.price-yearly').style.display = (dealType === '연세') ? 'flex' : 'none';
+  }
+
+  function resetForm() {
+    document.querySelectorAll('.modal input, .modal textarea').forEach(el => el.value = '');
+    document.getElementById('form_type').value = '토지';
+    document.getElementById('form_dealType').value = '매매';
+    document.getElementById('form_status').value = '1.광고중';
+    toggleConditionalFields();
+    togglePriceFields();
+  }
+
+  function openRegisterModal(lat, lng) {
+    resetForm();
+    document.getElementById('modalTitle').innerText = "신규 매물 등록";
+    document.getElementById('form_id').value = "";
+    document.getElementById('form_lat').value = lat;
+    document.getElementById('form_lng').value = lng;
+    document.getElementById('btnDelete').style.display = "none";
+    showModal();
+  }
+
+  function openViewModal(item) {
+    resetForm();
+    document.getElementById('modalTitle').innerText = "매물 수정 (" + item.id + ")";
+    document.getElementById('form_id').value = item.id;
+    document.getElementById('form_lat').value = item.lat;
+    document.getElementById('form_lng').value = item.lng;
+
+    document.getElementById('form_type').value = item.type || '토지';
+    document.getElementById('form_dealType').value = item.dealType || '매매';
+    document.getElementById('form_status').value = item.status || '1.광고중';
+    document.getElementById('form_address').value = item.address || '';
+
+    document.getElementById('form_price_sale').value = item.price_sale || '';
+    document.getElementById('form_price_per_pyeong').value = item.price_per_pyeong || '';
+    document.getElementById('form_deposit').value = item.deposit || '';
+    document.getElementById('form_monthly').value = item.monthly || '';
+    document.getElementById('form_deposit2').value = item.deposit || '';
+    document.getElementById('form_yearly').value = item.yearly || '';
+    document.getElementById('form_maintenanceFee').value = item.maintenanceFee || '';
+    document.getElementById('form_maintenanceFeeItems').value = item.maintenanceFeeItems || '';
+
+    document.getElementById('form_area_land').value = item.area_land || '';
+    document.getElementById('form_landZone').value = item.landZone || '';
+    document.getElementById('form_districtZone').value = item.districtZone || '';
+
+    document.getElementById('form_area_supply_1').value = item.area_supply || '';
+    document.getElementById('form_area_exclusive_1').value = item.area_exclusive || '';
+    document.getElementById('form_premium').value = item.premium || '';
+    document.getElementById('form_occupancyStatus').value = item.occupancyStatus || '';
+    document.getElementById('form_currentBiz').value = item.currentBiz || '';
+    document.getElementById('form_recommendBiz').value = item.recommendBiz || '';
+
+    document.getElementById('form_area_land_2').value = item.area_land || '';
+    document.getElementById('form_area_supply_2').value = item.area_supply || '';
+    document.getElementById('form_powerSupply').value = item.powerSupply || '';
+    document.getElementById('form_ceilingHeight').value = item.ceilingHeight || '';
+
+    document.getElementById('form_area_supply_3').value = item.area_supply || '';
+    document.getElementById('form_area_exclusive_3').value = item.area_exclusive || '';
+    document.getElementById('form_rooms').value = item.rooms || '';
+    document.getElementById('form_bathrooms').value = item.bathrooms || '';
+    document.getElementById('form_direction').value = item.direction || '';
+    document.getElementById('form_pet').value = item.pet || '';
+    document.getElementById('form_structureNote').value = item.structureNote || '';
+
+    document.getElementById('form_photoLink').value = item.photoLink || '';
+    document.getElementById('form_videoLink').value = item.videoLink || '';
+    document.getElementById('form_blogLink').value = item.blogLink || '';
+    document.getElementById('form_memo').value = item.memo || '';
+
+    toggleConditionalFields();
+    togglePriceFields();
+    document.getElementById('btnDelete').style.display = "inline-block";
+    showModal();
+  }
+
+  function showModal() {
+    document.getElementById('propertyModal').style.display = "block";
+    document.getElementById('modalOverlay').style.display = "block";
+  }
+  function closeModal() {
+    document.getElementById('propertyModal').style.display = "none";
+    document.getElementById('modalOverlay').style.display = "none";
+  }
+
+  function collectPayload() {
+    const type = document.getElementById('form_type').value;
+    const dealType = document.getElementById('form_dealType').value;
+
+    const payload = {
+      token: API_TOKEN,
+      id: document.getElementById('form_id').value,
+      lat: document.getElementById('form_lat').value,
+      lng: document.getElementById('form_lng').value,
+      type: type,
+      dealType: dealType,
+      status: document.getElementById('form_status').value,
+      address: document.getElementById('form_address').value,
+      maintenanceFee: document.getElementById('form_maintenanceFee').value,
+      maintenanceFeeItems: document.getElementById('form_maintenanceFeeItems').value,
+      photoLink: document.getElementById('form_photoLink').value,
+      videoLink: document.getElementById('form_videoLink').value,
+      blogLink: document.getElementById('form_blogLink').value,
+      memo: document.getElementById('form_memo').value
+    };
+
+    if (dealType === '매매') {
+      payload.price_sale = document.getElementById('form_price_sale').value;
+      payload.price_per_pyeong = document.getElementById('form_price_per_pyeong').value;
+    } else if (dealType === '보증금월세') {
+      payload.deposit = document.getElementById('form_deposit').value;
+      payload.monthly = document.getElementById('form_monthly').value;
+    } else if (dealType === '연세') {
+      payload.deposit = document.getElementById('form_deposit2').value;
+      payload.yearly = document.getElementById('form_yearly').value;
+    }
+
+    if (type === '토지') {
+      payload.area_land = document.getElementById('form_area_land').value;
+      payload.landZone = document.getElementById('form_landZone').value;
+      payload.districtZone = document.getElementById('form_districtZone').value;
+    } else if (type === '상가') {
+      payload.area_supply = document.getElementById('form_area_supply_1').value;
+      payload.area_exclusive = document.getElementById('form_area_exclusive_1').value;
+      payload.premium = document.getElementById('form_premium').value;
+      payload.occupancyStatus = document.getElementById('form_occupancyStatus').value;
+      payload.currentBiz = document.getElementById('form_currentBiz').value;
+      payload.recommendBiz = document.getElementById('form_recommendBiz').value;
+    } else if (type === '공장창고') {
+      payload.area_land = document.getElementById('form_area_land_2').value;
+      payload.area_supply = document.getElementById('form_area_supply_2').value;
+      payload.powerSupply = document.getElementById('form_powerSupply').value;
+      payload.ceilingHeight = document.getElementById('form_ceilingHeight').value;
+    } else if (type === '주택') {
+      payload.area_supply = document.getElementById('form_area_supply_3').value;
+      payload.area_exclusive = document.getElementById('form_area_exclusive_3').value;
+      payload.rooms = document.getElementById('form_rooms').value;
+      payload.bathrooms = document.getElementById('form_bathrooms').value;
+      payload.direction = document.getElementById('form_direction').value;
+      payload.pet = document.getElementById('form_pet').value;
+      payload.structureNote = document.getElementById('form_structureNote').value;
+    }
+
+    return payload;
+  }
+
+  function saveProperty() {
+    const payload = collectPayload();
+    payload.action = payload.id ? "update" : "create";
+
+    if (!payload.address) { alert("소재지 주소를 입력해주세요."); return; }
+
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(res => {
+        alert(res.message);
+        if (res.success) { closeModal(); loadData(); }
+      })
+      .catch(err => alert("전송 실패: " + err));
+  }
+
+  function deleteProperty() {
+    if (!confirm("정말 이 매물을 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
+    const payload = { token: API_TOKEN, action: "delete", id: document.getElementById('form_id').value };
+
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(res => {
+        alert(res.message);
+        if (res.success) { closeModal(); loadData(); }
+      })
+      .catch(err => alert("삭제 실패: " + err));
+  }
+
+  window.onload = loadData;
+</script>
+</body>
+</html>
