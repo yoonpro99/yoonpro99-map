@@ -19,11 +19,19 @@
   .list-container { flex: 1; overflow-y: auto; }
   .item-card { padding: 14px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
   .item-card:hover { background: #f9f9f9; }
-  .item-card .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:3px; background:#eef7ee; color:#00a844; margin-right:6px; }
+  .badges { margin-bottom:4px; }
+  .item-card .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:3px; margin-right:4px; }
+  .badge-status { background:#eef7ee; color:#00a844; }
+  .badge-type { background:#eef2fb; color:#3a6bd8; }
+  .badge-deal { background:#fdf0e6; color:#d97a2b; }
   .item-card .title { font-weight: bold; font-size: 14px; color: #222; margin: 4px 0; }
   .item-card .price { font-size: 13px; color: #00a844; font-weight:bold; }
+  .item-card .type-summary { font-size: 11px; color: #888; margin-top:2px; }
   .item-card .addr { font-size: 11px; color: #999; margin-top:2px; }
   .item-card .customer { font-size: 11px; color: #777; margin-top:2px; }
+  .blog-btn { display:inline-block; margin-top:6px; font-size:11px; color:#3a6bd8; text-decoration:none; border:1px solid #3a6bd8; border-radius:3px; padding:2px 8px; }
+  .blog-btn:hover { background:#3a6bd8; color:white; }
+  .marker-label { background:white; border:1px solid #ccc; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:bold; color:#333; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
 
   .map-area { flex: 1; height: 100%; position: relative; }
   #map { width: 100%; height: 100%; }
@@ -243,9 +251,7 @@
     <div class="form-group"><label>구조 특징 (복층/다락 등)</label><input type="text" id="form_structureNote"></div>
   </div>
 
-  <div class="section-label">미디어 &amp; 메모</div>
-  <div class="form-group"><label>NAS 사진링크</label><input type="text" id="form_photoLink"></div>
-  <div class="form-group"><label>NAS 영상링크</label><input type="text" id="form_videoLink"></div>
+  <div class="section-label">메모</div>
   <div class="form-group"><label>블로그 링크</label><input type="text" id="form_blogLink"></div>
   <div class="form-group"><label>메모</label><textarea id="form_memo"></textarea></div>
 
@@ -263,9 +269,24 @@
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx406y9ZfCV0tlx-V80zo3EPU4OABEVs5FXSDje8Tk6lO6Bcoy2j9IjDmOW7vIyu2eb/exec";
   const API_TOKEN = "7d8770e7-81fb-472d-8bd2-83672ee0c8e1";
 
-  let map, markers = [], currentData = [];
+  let map, markers = [], labelOverlays = [], currentData = [];
   let tempMarker = null; // 등록 중 위치 조정용 임시 마커
   const geocoder = new kakao.maps.services.Geocoder();
+
+  const MARKER_COLORS = { '토지': '#8BC34A', '상가': '#FF9800', '공장창고': '#795548', '주택': '#2196F3' };
+  const markerImageCache = {};
+
+  function markerImageForType(type) {
+    const color = MARKER_COLORS[type] || '#999999';
+    if (markerImageCache[color]) return markerImageCache[color];
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="40">'
+      + '<path d="M15 0C7 0 0 7 0 15c0 11 15 25 15 25s15-14 15-25C30 7 23 0 15 0z" fill="' + color + '" stroke="white" stroke-width="2"/>'
+      + '<circle cx="15" cy="15" r="5" fill="white"/></svg>';
+    const src = 'data:image/svg+xml;base64,' + btoa(svg);
+    const img = new kakao.maps.MarkerImage(src, new kakao.maps.Size(30, 40), { offset: new kakao.maps.Point(15, 40) });
+    markerImageCache[color] = img;
+    return img;
+  }
 
   const container = document.getElementById('map');
   map = new kakao.maps.Map(container, {
@@ -329,6 +350,8 @@
   function applyFilters(fitBounds) {
     markers.forEach(m => m.setMap(null));
     markers = [];
+    labelOverlays.forEach(o => o.setMap(null));
+    labelOverlays = [];
 
     const filtered = getFilteredData();
     renderList(filtered);
@@ -339,10 +362,18 @@
 
     filtered.forEach(item => {
       const pos = new kakao.maps.LatLng(item.lat, item.lng);
-      const marker = new kakao.maps.Marker({ position: pos, map: map });
+      const marker = new kakao.maps.Marker({ position: pos, map: map, image: markerImageForType(item.type) });
       markers.push(marker);
       bounds.extend(pos);
       kakao.maps.event.addListener(marker, 'click', () => openViewModal(item));
+
+      const label = new kakao.maps.CustomOverlay({
+        position: pos,
+        content: '<div class="marker-label">' + (item.name || '') + '</div>',
+        yAnchor: 2.0
+      });
+      label.setMap(map);
+      labelOverlays.push(label);
     });
 
     if (fitBounds) map.setBounds(bounds);
@@ -356,6 +387,14 @@
     return (item.dealType || '') + ' ' + (item.deposit || 0) + '/' + (item.monthly || 0);
   }
 
+  function typeSummary(item) {
+    if (item.type === '토지') return '대지 ' + (item.area_land || '-') + '평';
+    if (item.type === '상가') return '전용 ' + (item.area_exclusive || '-') + '평 · ' + (item.currentBiz || '업종미정');
+    if (item.type === '공장창고') return '대지 ' + (item.area_land || '-') + '평 · 층고 ' + (item.ceilingHeight || '-');
+    if (item.type === '주택') return (item.rooms || '-') + '방 ' + (item.bathrooms || '-') + '욕실 · 전용 ' + (item.area_exclusive || '-') + '평';
+    return '';
+  }
+
   function renderList(data) {
     const listDiv = document.getElementById('itemList');
     listDiv.innerHTML = '';
@@ -363,11 +402,17 @@
       const card = document.createElement('div');
       card.className = 'item-card';
       card.innerHTML = `
-        <span class="badge">${item.status || ''}</span>
+        <div class="badges">
+          <span class="badge badge-status">${item.status || ''}</span>
+          <span class="badge badge-type">${item.type || ''}</span>
+          <span class="badge badge-deal">${item.dealType || ''}</span>
+        </div>
         <div class="title">${item.name || '(매물명 생성중)'}</div>
         <div class="price">${formatPrice(item)}</div>
+        <div class="type-summary">${typeSummary(item)}</div>
         <div class="addr">${item.address || ''}</div>
         ${item.customerName ? `<div class="customer">고객: ${item.customerName}</div>` : ''}
+        ${item.blogLink ? `<a class="blog-btn" href="${item.blogLink}" target="_blank" onclick="event.stopPropagation()">블로그 보기</a>` : ''}
       `;
       card.onclick = () => {
         map.panTo(new kakao.maps.LatLng(item.lat, item.lng));
@@ -507,8 +552,6 @@
     document.getElementById('form_pet').value = item.pet || '';
     document.getElementById('form_structureNote').value = item.structureNote || '';
 
-    document.getElementById('form_photoLink').value = item.photoLink || '';
-    document.getElementById('form_videoLink').value = item.videoLink || '';
     document.getElementById('form_blogLink').value = item.blogLink || '';
     document.getElementById('form_memo').value = item.memo || '';
 
@@ -543,8 +586,6 @@
       address: document.getElementById('form_address').value,
       maintenanceFee: document.getElementById('form_maintenanceFee').value,
       maintenanceFeeItems: document.getElementById('form_maintenanceFeeItems').value,
-      photoLink: document.getElementById('form_photoLink').value,
-      videoLink: document.getElementById('form_videoLink').value,
       blogLink: document.getElementById('form_blogLink').value,
       memo: document.getElementById('form_memo').value
     };
