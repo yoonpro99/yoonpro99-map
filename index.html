@@ -14,6 +14,8 @@
   .sidebar-header .count { font-size: 12px; color: #888; margin-top:6px; }
   .btn-new { width:100%; padding:10px; background:#00a844; color:white; border:none; border-radius:6px; font-weight:bold; font-size:13px; cursor:pointer; }
   .btn-new:hover { background:#009440; }
+  .filter-row { display:flex; gap:6px; margin-top:10px; }
+  .filter-row select { flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px; background:white; }
   .list-container { flex: 1; overflow-y: auto; }
   .item-card { padding: 14px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
   .item-card:hover { background: #f9f9f9; }
@@ -59,6 +61,28 @@
     <div class="sidebar-header">
       <h2>매물 목록</h2>
       <button class="btn-new" onclick="startRegister()">+ 신규 매물 등록</button>
+      <div class="filter-row">
+        <select id="filterStatus" onchange="applyFilters()">
+          <option value="">상태: 전체</option>
+          <option value="1.광고중" selected>1.광고중</option>
+          <option value="2.진행중">2.진행중</option>
+          <option value="3.계약완료">3.계약완료</option>
+          <option value="4.종료">4.종료</option>
+        </select>
+        <select id="filterDealType" onchange="applyFilters()">
+          <option value="">거래: 전체</option>
+          <option value="매매">매매</option>
+          <option value="보증금월세">보증금/월세</option>
+          <option value="연세">연세</option>
+        </select>
+        <select id="filterType" onchange="applyFilters()">
+          <option value="">유형: 전체</option>
+          <option value="토지">토지</option>
+          <option value="상가">상가</option>
+          <option value="공장창고">공장창고</option>
+          <option value="주택">주택</option>
+        </select>
+      </div>
       <div class="count" id="listCount">불러오는 중...</div>
     </div>
     <div class="list-container" id="itemList"></div>
@@ -204,11 +228,11 @@
 </div>
 
 <!-- appkey를 본인의 카카오 JavaScript 키로 교체하세요. libraries=services는 주소 검색(지오코딩)에 필요합니다 -->
-<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=3e39f7248f3829204f5bd2ef0cf24e94&libraries=services"></script>
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=여기에_카카오_JS_키&libraries=services"></script>
 <script>
   // 아래 값들을 본인 환경(테스트 시트=map_test_1 기준)에 맞게 채워주세요
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbx406y9ZfCV0tlx-V80zo3EPU4OABEVs5FXSDje8Tk6lO6Bcoy2j9IjDmOW7vIyu2eb/exec";
-  const API_TOKEN = "694f583a-2eca-476e-a198-07312c99cede";
+  const GAS_URL = "여기에_Apps_Script_웹앱_URL";
+  const API_TOKEN = "여기에_setupApiToken_실행결과_토큰";
 
   let map, markers = [], currentData = [];
   let tempMarker = null; // 등록 중 위치 조정용 임시 마커
@@ -225,30 +249,49 @@
   }
 
   function loadData() {
-    markers.forEach(m => m.setMap(null));
-    markers = [];
-
     fetch(fetchUrl(GAS_URL))
       .then(res => res.json())
       .then(data => {
         if (data.error) { alert(data.error); return; }
         currentData = data;
-        renderList(data);
-        document.getElementById('listCount').innerText = data.length + '건';
-
-        if (data.length === 0) return;
-        const bounds = new kakao.maps.LatLngBounds();
-
-        data.forEach(item => {
-          const pos = new kakao.maps.LatLng(item.lat, item.lng);
-          const marker = new kakao.maps.Marker({ position: pos, map: map });
-          markers.push(marker);
-          bounds.extend(pos);
-          kakao.maps.event.addListener(marker, 'click', () => openViewModal(item));
-        });
-        map.setBounds(bounds);
+        applyFilters(true); // 최초 로드 시에는 지도 범위도 자동으로 맞춤
       })
       .catch(err => alert("데이터 로딩 실패: " + err));
+  }
+
+  function getFilteredData() {
+    const status = document.getElementById('filterStatus').value;
+    const dealType = document.getElementById('filterDealType').value;
+    const type = document.getElementById('filterType').value;
+
+    return currentData.filter(item => {
+      if (status && item.status !== status) return false;
+      if (dealType && item.dealType !== dealType) return false;
+      if (type && item.type !== type) return false;
+      return true;
+    });
+  }
+
+  function applyFilters(fitBounds) {
+    markers.forEach(m => m.setMap(null));
+    markers = [];
+
+    const filtered = getFilteredData();
+    renderList(filtered);
+    document.getElementById('listCount').innerText = filtered.length + '건 (전체 ' + currentData.length + '건)';
+
+    if (filtered.length === 0) return;
+    const bounds = new kakao.maps.LatLngBounds();
+
+    filtered.forEach(item => {
+      const pos = new kakao.maps.LatLng(item.lat, item.lng);
+      const marker = new kakao.maps.Marker({ position: pos, map: map });
+      markers.push(marker);
+      bounds.extend(pos);
+      kakao.maps.event.addListener(marker, 'click', () => openViewModal(item));
+    });
+
+    if (fitBounds) map.setBounds(bounds);
   }
 
   function formatPrice(item) {
