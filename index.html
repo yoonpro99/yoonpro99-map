@@ -14,6 +14,12 @@
   .sidebar-header .count { font-size: 12px; color: #888; margin-top:6px; }
   .btn-new { width:100%; padding:10px; background:#00a844; color:white; border:none; border-radius:6px; font-weight:bold; font-size:13px; cursor:pointer; }
   .btn-new:hover { background:#009440; }
+  .btn-row-3 { display:flex; gap:6px; }
+  .btn-row-3 button { flex:1; padding:9px 0; border:none; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; }
+  .btn-new { background:#00a844; color:white; }
+  .btn-reset { background:#f0f0f0; color:#555; }
+  .btn-search { background:#3a6bd8; color:white; }
+  .advanced-search { margin-top:8px; padding:8px; background:#f7f8fa; border-radius:6px; }
   .filter-row { display:flex; gap:6px; margin-top:10px; }
   .filter-row select { flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px; background:white; }
   .list-container { flex: 1; overflow-y: auto; }
@@ -76,12 +82,45 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <h2>매물 목록</h2>
-      <button class="btn-new" onclick="startRegister()">+ 신규 매물 등록</button>
+      <div class="btn-row-3">
+        <button class="btn-new" onclick="startRegister()">신규</button>
+        <button class="btn-reset" onclick="resetFilters()">초기화</button>
+        <button class="btn-search" onclick="toggleAdvancedSearch()">검색</button>
+      </div>
+      <div class="advanced-search" id="advancedSearch" style="display:none;">
+        <div class="form-row" style="margin-bottom:6px;">
+          <select id="filterKind" onchange="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+            <option value="">매물종류: 전체</option>
+          </select>
+          <select id="filterPriceField" onchange="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+            <option value="">가격기준: 자동(거래유형)</option>
+            <option value="price_sale">매매가</option>
+            <option value="deposit">보증금</option>
+            <option value="yearly">연세</option>
+            <option value="monthly">월세</option>
+            <option value="premium">권리금</option>
+            <option value="price_per_pyeong">평단가</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:6px;">
+          <input type="number" id="filterLandMin" placeholder="대지(평) 최소" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+          <input type="number" id="filterLandMax" placeholder="대지(평) 최대" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+        </div>
+        <div class="form-row">
+          <input type="number" id="filterRoomsMin" placeholder="방 이상(개)" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+          <select id="filterPet" onchange="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+            <option value="">반려동물: 전체</option>
+            <option value="가능">가능</option>
+            <option value="불가">불가</option>
+            <option value="협의">협의</option>
+          </select>
+        </div>
+      </div>
       <div class="filter-row">
         <input type="text" id="filterAddress" placeholder="소재지 검색 (예: 남원읍)" oninput="applyFilters()" style="flex:1; padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
       </div>
       <div class="filter-row">
-        <select id="filterType" onchange="applyFilters()">
+        <select id="filterType" onchange="refreshFilterKindOptions(); applyFilters()">
           <option value="">유형: 전체</option>
           <option value="토지">토지</option>
           <option value="상가">상가</option>
@@ -122,11 +161,6 @@
   </div>
 
   <div class="map-area">
-    <div class="confirm-bar" id="confirmBar">
-      <div class="msg" id="confirmMsg">핀 위치를 확인하세요. 드래그로 위치를 조정할 수 있습니다.</div>
-      <button class="btn btn-go" onclick="proceedToForm()">다음: 정보 입력</button>
-      <button class="btn btn-stop" onclick="cancelRegisterFlow()">취소</button>
-    </div>
     <div id="map"></div>
   </div>
 </div>
@@ -147,11 +181,11 @@
 <div class="modal" id="propertyModal">
   <h3 id="modalTitle">매물 등록</h3>
   <div class="name-preview">매물명은 시트 수식으로 자동 생성됩니다. 여기서는 입력하지 않습니다.</div>
-  <div class="customer-preview" id="customerPreview" style="display:none;"></div>
 
   <input type="hidden" id="form_id">
   <input type="hidden" id="form_lat">
   <input type="hidden" id="form_lng">
+  <input type="hidden" id="form_customerId">
 
   <div class="form-row">
     <div class="form-group">
@@ -163,6 +197,13 @@
         <option value="주택">주택</option>
       </select>
     </div>
+    <div class="form-group">
+      <label>매물종류</label>
+      <select id="form_kind"></select>
+    </div>
+  </div>
+
+  <div class="form-row">
     <div class="form-group">
       <label>거래유형</label>
       <select id="form_dealType" onchange="togglePriceFields()">
@@ -178,23 +219,44 @@
         <option value="임차 단기">임차 단기</option>
       </select>
     </div>
+    <div class="form-group">
+      <label>매물상태</label>
+      <select id="form_status">
+        <option value="1.광고중">1.광고중</option>
+        <option value="2.문의중">2.문의중</option>
+        <option value="3.협의중">3.협의중</option>
+        <option value="4.계약완료">4.계약완료</option>
+        <option value="5.보류">5.보류</option>
+        <option value="6.종료">6.종료</option>
+      </select>
+    </div>
   </div>
 
+  <div class="section-label" style="margin-top:6px;">소재지</div>
   <div class="form-group">
-    <label>매물상태</label>
-    <select id="form_status">
-      <option value="1.광고중">1.광고중</option>
-      <option value="2.문의중">2.문의중</option>
-      <option value="3.협의중">3.협의중</option>
-      <option value="4.계약완료">4.계약완료</option>
-      <option value="5.보류">5.보류</option>
-      <option value="6.종료">6.종료</option>
-    </select>
+    <label>읍/면/리 (목록에서 검색)</label>
+    <input type="text" id="form_location" list="locationsList" placeholder="예: 서귀포시 남원읍 남원리">
+    <datalist id="locationsList"></datalist>
   </div>
-
+  <div class="form-row">
+    <div class="form-group"><label>본번</label><input type="number" id="form_bonbun"></div>
+    <div class="form-group"><label>부번 (없으면 비움)</label><input type="number" id="form_bubun"></div>
+    <div class="form-group" style="flex:0 0 70px;">
+      <label>산</label>
+      <input type="checkbox" id="form_san" style="width:auto; margin-top:8px;">
+    </div>
+  </div>
   <div class="form-group">
-    <label>소재지 주소</label>
-    <input type="text" id="form_address" placeholder="지번 또는 도로명 주소">
+    <button type="button" class="btn btn-cancel" style="width:100%;" onclick="geocodeFormAddress()">위치 확인 (좌표 계산)</button>
+    <div id="geocodeStatus" style="font-size:11px; color:#00a844; margin-top:4px;"></div>
+  </div>
+  <input type="hidden" id="form_address">
+
+  <div class="section-label" style="margin-top:6px;">고객 연결 (선택)</div>
+  <div class="form-group">
+    <label>고객 검색 (이름 입력)</label>
+    <input type="text" id="form_customerSearch" list="customersList" placeholder="고객명 입력" oninput="resolveCustomer()">
+    <datalist id="customersList"></datalist>
   </div>
 
   <div class="form-row price-sale">
@@ -205,6 +267,7 @@
     <div class="form-group"><label>보증금(전세)</label><input type="text" id="form_deposit_jeonse"></div>
   </div>
   <div class="form-row price-yearly">
+
     <div class="form-group"><label>보증금</label><input type="text" id="form_deposit_yearly"></div>
     <div class="form-group"><label>연세</label><input type="text" id="form_yearly"></div>
   </div>
@@ -289,10 +352,19 @@
   const GAS_URL = "https://script.google.com/macros/s/AKfycbx406y9ZfCV0tlx-V80zo3EPU4OABEVs5FXSDje8Tk6lO6Bcoy2j9IjDmOW7vIyu2eb/exec";
   const API_TOKEN = "7d8770e7-81fb-472d-8bd2-83672ee0c8e1";
 
-  let map, markers = [], currentData = [];
-  let tempMarker = null; // 등록 중 위치 조정용 임시 마커
+  let map, markers = [], currentData = [], currentCustomers = [];
   const geocoder = new kakao.maps.services.Geocoder();
 
+  const LOCATIONS = ["서귀포시 강정동", "서귀포시 남원읍 남원리", "서귀포시 남원읍 위미리", "서귀포시 남원읍 태흥리", "서귀포시 대정읍 구억리", "서귀포시 대정읍 동일리", "서귀포시 대정읍 무릉리", "서귀포시 대정읍 보성리", "서귀포시 대정읍 신도리", "서귀포시 대정읍 일과리", "서귀포시 동홍동", "서귀포시 상예동", "서귀포시 서귀동", "서귀포시 서호동", "서귀포시 서홍동", "서귀포시 호근동", "서귀포시 성산읍 고성리", "서귀포시 성산읍 난산리", "서귀포시 성산읍 삼달리", "서귀포시 성산읍 성산리", "서귀포시 성산읍 수산리", "서귀포시 성산읍 시흥리", "서귀포시 성산읍 신산리", "서귀포시 성산읍 신천리", "서귀포시 성산읍 신풍리", "서귀포시 성산읍 오조리", "서귀포시 성산읍 온평리", "서귀포시 안덕면 감산리", "서귀포시 안덕면 덕수리", "서귀포시 안덕면 동광리", "서귀포시 안덕면 사계리", "서귀포시 안덕면 상창리", "서귀포시 안덕면 서광리", "서귀포시 안덕면 창천리", "서귀포시 안덕면 화순리", "서귀포시 중문동", "서귀포시 표선면 가시리", "서귀포시 표선면 성읍리", "서귀포시 표선면 세화리", "서귀포시 표선면 토산리", "서귀포시 표선면 표선리", "서귀포시 표선읍면 하천리", "서귀포시 하효동", "서귀포시 회수동", "제주시 건입동", "제주시 구좌읍 김녕리", "제주시 구좌읍 동복리", "제주시 구좌읍 상도리", "제주시 구좌읍 세화리", "제주시 구좌읍 송당리", "제주시 구좌읍 월정리", "제주시 구좌읍 종달리", "제주시 구좌읍 평대리", "제주시 구좌읍 하도리", "제주시 구좌읍 한동리", "제주시 구좌읍 행원리", "제주시 내도동", "제주시 노형동", "제주시 도남동", "제주시 도두이동", "제주시 도두일동", "제주시 도련이동", "제주시 도련일동", "제주시 도평동", "제주시 봉개동", "제주시 삼도이동", "제주시 삼도일동", "제주시 삼양동", "제주시 삼양삼동", "제주시 삼양이동", "제주시 삼양일동", "제주시 아라이동", "제주시 아라일동", "제주시 애월읍 고내리", "제주시 애월읍 고성리", "제주시 애월읍 곽지리", "제주시 애월읍 광령리", "제주시 애월읍 구엄리", "제주시 애월읍 금성리", "제주시 애월읍 납읍리", "제주시 애월읍 봉성리", "제주시 애월읍 상가리", "제주시 애월읍 상귀리", "제주시 애월읍 소길리", "제주시 애월읍 수산리", "제주시 애월읍 신엄리", "제주시 애월읍 애월리", "제주시 애월읍 어음리", "제주시 애월읍 유수암리", "제주시 애월읍 장전리", "제주시 애월읍 하가리", "제주시 애월읍 하귀1리", "제주시 애월읍 하귀2리", "제주시 연동", "제주시 영평동", "제주시 오등동", "제주시 오라삼동", "제주시 오라이동", "제주시 오라일동", "제주시 외도이동", "제주시 외도일동", "제주시 용강동", "제주시 용담삼동", "제주시 용담이동", "제주시 용담일동", "제주시 우도면", "제주시 월평동", "제주시 이도이동", "제주시 이도일동", "제주시 이호이동", "제주시 이호일동", "제주시 일도이동", "제주시 일도일동", "제주시 조천읍 교래리", "제주시 조천읍 대흘리", "제주시 조천읍 북촌리", "제주시 조천읍 선흘리", "제주시 조천읍 신촌리", "제주시 조천읍 신흥리", "제주시 조천읍 와산리", "제주시 조천읍 와흘리", "제주시 조천읍 조천리", "제주시 조천읍 함덕리", "제주시 추자면", "제주시 한경면 고산리", "제주시 한경면 금등리", "제주시 한경면 낙천리", "제주시 한경면 두모리", "제주시 한경면 신창리", "제주시 한경면 용수리", "제주시 한경면 저지리", "제주시 한경면 조수리", "제주시 한경면 청수리", "제주시 한경면 판포리", "제주시 한림읍 귀덕리", "제주시 한림읍 금능리", "제주시 한림읍 금악리", "제주시 한림읍 대림리", "제주시 한림읍 동명리", "제주시 한림읍 명월리", "제주시 한림읍 상대리", "제주시 한림읍 상명리", "제주시 한림읍 수원리", "제주시 한림읍 옹포리", "제주시 한림읍 월령리", "제주시 한림읍 월림리", "제주시 한림읍 한림리", "제주시 한림읍 한수리", "제주시 한림읍 협재리", "제주시 해안동", "제주시 화북이동", "제주시 화북일동", "제주시 회천동"];
+
+  const KIND_OPTIONS = {
+    '주택': ["원룸", "2룸", "3룸", "단독", "단독다가구", "구옥", "전원농가", "타운하우스", "아파트", "빌라", "연립", "다세대", "오피스텔", "생활숙박시설"],
+    '상가': ["일반상가", "사무실", "상가건물(통매)", "숙박시설(펜션/모텔)", "근생부지", "빌딩"],
+    '토지': ["전", "답", "과수원", "임야", "대지", "잡종지", "목장용지"],
+    '공장창고': ["공장", "창고", "야적장", "지식산업센터"]
+  };
+
+  document.getElementById('locationsList').innerHTML = LOCATIONS.map(l => '<option value="' + l + '">').join('');
   const MARKER_COLORS = { '토지': '#000000', '주택': '#9C27B0', '상가': '#F44336', '공장창고': '#2196F3' };
   const markerImageCache = {};
 
@@ -323,10 +395,76 @@
       .then(res => res.json())
       .then(data => {
         if (data.error) { alert(data.error); return; }
-        currentData = data;
+        currentData = data.properties || [];
+        currentCustomers = data.customers || [];
+        populateCustomerList(currentCustomers);
         applyFilters(true); // 최초 로드 시에는 지도 범위도 자동으로 맞춤
       })
       .catch(err => alert("데이터 로딩 실패: " + err));
+  }
+
+  function populateCustomerList(customers) {
+    document.getElementById('customersList').innerHTML =
+      customers.map(c => '<option value="' + c.name + ' (' + c.id + ')">').join('');
+  }
+
+  function resolveCustomer() {
+    const val = document.getElementById('form_customerSearch').value;
+    const match = val.match(/\(([^)]+)\)\s*$/);
+    document.getElementById('form_customerId').value = match ? match[1] : '';
+  }
+
+  function composeAddress() {
+    const loc = document.getElementById('form_location').value.trim();
+    const san = document.getElementById('form_san').checked;
+    const bonbun = document.getElementById('form_bonbun').value;
+    const bubun = document.getElementById('form_bubun').value;
+    if (!loc || !bonbun) return '';
+    const jibun = (san ? '산' : '') + bonbun + (bubun ? '-' + bubun : '');
+    return loc + ' ' + jibun;
+  }
+
+  function geocodeFormAddress() {
+    const address = composeAddress();
+    const statusEl = document.getElementById('geocodeStatus');
+    if (!address) { alert('읍/면/리와 본번을 입력해주세요.'); return; }
+
+    geocoder.addressSearch(address, function (result, status) {
+      if (status !== kakao.maps.services.Status.OK) {
+        statusEl.style.color = '#ff4d4f';
+        statusEl.innerText = '✗ 주소를 찾을 수 없습니다: ' + address;
+        return;
+      }
+      document.getElementById('form_lat').value = result[0].y;
+      document.getElementById('form_lng').value = result[0].x;
+      document.getElementById('form_address').value = address;
+      statusEl.style.color = '#00a844';
+      statusEl.innerText = '✓ 좌표 확인됨: ' + address;
+    });
+  }
+
+  function findLocationMatch(address) {
+    if (!address) return '';
+    let best = '';
+    LOCATIONS.forEach(loc => {
+      if (address.indexOf(loc) === 0 && loc.length > best.length) best = loc;
+    });
+    return best;
+  }
+
+  function refreshKindOptions(selectedKind) {
+    const type = document.getElementById('form_type').value;
+    const opts = KIND_OPTIONS[type] || [];
+    const sel = document.getElementById('form_kind');
+    sel.innerHTML = opts.map(o => '<option value="' + o + '">' + o + '</option>').join('');
+    if (selectedKind && opts.indexOf(selectedKind) !== -1) sel.value = selectedKind;
+  }
+
+  function refreshFilterKindOptions() {
+    const type = document.getElementById('filterType').value;
+    const sel = document.getElementById('filterKind');
+    const opts = type ? (KIND_OPTIONS[type] || []) : Object.values(KIND_OPTIONS).flat();
+    sel.innerHTML = '<option value="">매물종류: 전체</option>' + opts.map(o => '<option value="' + o + '">' + o + '</option>').join('');
   }
 
   function parseNum(v) {
@@ -335,7 +473,8 @@
     return isNaN(n) ? null : n;
   }
 
-  function itemPrimaryPrice(item) {
+  function itemPrimaryPrice(item, fieldOverride) {
+    if (fieldOverride) return parseNum(item[fieldOverride]);
     const group = priceGroup(item.dealType);
     if (group === 'sale') return parseNum(item.price_sale);
     if (group === 'jeonse') return parseNum(item.deposit);
@@ -351,18 +490,41 @@
     const minPrice = parseNum(document.getElementById('filterMinPrice').value);
     const maxPrice = parseNum(document.getElementById('filterMaxPrice').value);
 
+    const kind = document.getElementById('filterKind').value;
+    const priceField = document.getElementById('filterPriceField').value;
+    const landMin = parseNum(document.getElementById('filterLandMin').value);
+    const landMax = parseNum(document.getElementById('filterLandMax').value);
+    const roomsMin = parseNum(document.getElementById('filterRoomsMin').value);
+    const pet = document.getElementById('filterPet').value;
+
     return currentData.filter(item => {
       if (status && item.status !== status) return false;
       if (dealType && item.dealType !== dealType) return false;
       if (type && item.type !== type) return false;
+      if (kind && item.kind !== kind) return false;
       if (addressKeyword && !(item.address || '').includes(addressKeyword)) return false;
 
       if (minPrice !== null || maxPrice !== null) {
-        const p = itemPrimaryPrice(item);
+        const p = itemPrimaryPrice(item, priceField);
         if (p === null) return false; // 금액 정보 없는 매물은 범위 필터 걸면 제외
         if (minPrice !== null && p < minPrice) return false;
         if (maxPrice !== null && p > maxPrice) return false;
       }
+
+      if (landMin !== null || landMax !== null) {
+        const land = parseNum(item.area_land);
+        if (land === null) return false;
+        if (landMin !== null && land < landMin) return false;
+        if (landMax !== null && land > landMax) return false;
+      }
+
+      if (roomsMin !== null) {
+        const rooms = parseNum(item.rooms);
+        if (rooms === null || rooms < roomsMin) return false;
+      }
+
+      if (pet && !(item.pet || '').includes(pet)) return false;
+
       return true;
     });
   }
@@ -438,39 +600,30 @@
   }
 
   // ===== 신규 등록 흐름: 버튼 -> 주소입력 -> 지오코딩 -> 핀 확인/조정 -> 폼 =====
+  function resetFilters() {
+    document.getElementById('filterAddress').value = '';
+    document.getElementById('filterType').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterDealType').value = '';
+    document.getElementById('filterMinPrice').value = '';
+    document.getElementById('filterMaxPrice').value = '';
+    document.getElementById('filterKind').value = '';
+    document.getElementById('filterPriceField').value = '';
+    document.getElementById('filterLandMin').value = '';
+    document.getElementById('filterLandMax').value = '';
+    document.getElementById('filterRoomsMin').value = '';
+    document.getElementById('filterPet').value = '';
+    refreshFilterKindOptions();
+    applyFilters();
+  }
+
+  function toggleAdvancedSearch() {
+    const panel = document.getElementById('advancedSearch');
+    panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
+  }
+
   function startRegister() {
-    const address = prompt("등록할 매물의 주소를 입력하세요 (지번 또는 도로명 주소)");
-    if (!address) return;
-
-    geocoder.addressSearch(address, function (result, status) {
-      if (status !== kakao.maps.services.Status.OK) {
-        alert("주소를 찾을 수 없습니다. 다시 확인해주세요.");
-        return;
-      }
-      const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-      placeTempMarker(coords, address);
-      map.setCenter(coords);
-      map.setLevel(4);
-      document.getElementById('confirmBar').style.display = 'block';
-    });
-  }
-
-  function placeTempMarker(coords, address) {
-    if (tempMarker) tempMarker.setMap(null);
-    tempMarker = new kakao.maps.Marker({ position: coords, map: map, draggable: true });
-    tempMarker.pendingAddress = address;
-  }
-
-  function cancelRegisterFlow() {
-    if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
-    document.getElementById('confirmBar').style.display = 'none';
-  }
-
-  function proceedToForm() {
-    if (!tempMarker) return;
-    const pos = tempMarker.getPosition();
-    document.getElementById('confirmBar').style.display = 'none';
-    openRegisterModal(pos.getLat(), pos.getLng(), tempMarker.pendingAddress);
+    openRegisterModal();
   }
 
   // ===== 조회 팝업 (마커/목록 클릭 시 - 유형별 핵심 정보만 가볍게 표시) =====
@@ -619,22 +772,24 @@
   }
 
   function resetForm() {
-    document.querySelectorAll('.modal input, .modal textarea').forEach(el => el.value = '');
+    document.querySelectorAll('.modal input, .modal textarea, .modal select').forEach(el => {
+      if (el.type === 'checkbox') el.checked = false; else el.value = '';
+    });
     document.getElementById('form_type').value = '토지';
     document.getElementById('form_dealType').value = '매도';
     document.getElementById('form_status').value = '1.광고중';
-    document.getElementById('customerPreview').style.display = 'none';
+    document.getElementById('geocodeStatus').innerText = '';
+    refreshKindOptions();
     toggleConditionalFields();
     togglePriceFields();
   }
 
-  function openRegisterModal(lat, lng, address) {
+  function openRegisterModal() {
     resetForm();
     document.getElementById('modalTitle').innerText = "신규 매물 등록";
     document.getElementById('form_id').value = "";
-    document.getElementById('form_lat').value = lat;
-    document.getElementById('form_lng').value = lng;
-    document.getElementById('form_address').value = address || "";
+    document.getElementById('form_lat').value = "";
+    document.getElementById('form_lng').value = "";
     document.getElementById('btnDelete').style.display = "none";
     showModal();
   }
@@ -647,14 +802,20 @@
     document.getElementById('form_lng').value = item.lng;
 
     document.getElementById('form_type').value = item.type || '토지';
-    document.getElementById('form_dealType').value = item.dealType || '매매';
+    refreshKindOptions(item.kind);
+    document.getElementById('form_dealType').value = item.dealType || '매도';
     document.getElementById('form_status').value = item.status || '1.광고중';
-    document.getElementById('form_address').value = item.address || '';
 
-    if (item.customerName) {
-      document.getElementById('customerPreview').style.display = 'block';
-      document.getElementById('customerPreview').innerText = '연결된 고객: ' + item.customerName;
-    }
+    document.getElementById('form_address').value = item.address || '';
+    document.getElementById('form_location').value = findLocationMatch(item.address);
+    document.getElementById('form_san').checked = !!item.san;
+    document.getElementById('form_bonbun').value = item.bonbun || '';
+    document.getElementById('form_bubun').value = item.bubun || '';
+    document.getElementById('geocodeStatus').innerText = item.address ? ('✓ 현재 좌표 사용 중: ' + item.address) : '';
+    document.getElementById('geocodeStatus').style.color = '#00a844';
+
+    document.getElementById('form_customerId').value = item.customerId || '';
+    document.getElementById('form_customerSearch').value = item.customerName ? (item.customerName + ' (' + item.customerId + ')') : '';
 
     document.getElementById('form_price_sale').value = item.price_sale || '';
     document.getElementById('form_price_per_pyeong').value = item.price_per_pyeong || '';
@@ -706,7 +867,6 @@
   function closeModal() {
     document.getElementById('propertyModal').style.display = "none";
     document.getElementById('modalOverlay').style.display = "none";
-    if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
   }
 
   function collectPayload() {
@@ -719,9 +879,14 @@
       lat: document.getElementById('form_lat').value,
       lng: document.getElementById('form_lng').value,
       type: type,
+      kind: document.getElementById('form_kind').value,
       dealType: dealType,
       status: document.getElementById('form_status').value,
       address: document.getElementById('form_address').value,
+      customerId: document.getElementById('form_customerId').value,
+      san: document.getElementById('form_san').checked,
+      bonbun: document.getElementById('form_bonbun').value,
+      bubun: document.getElementById('form_bubun').value,
       maintenanceFee: document.getElementById('form_maintenanceFee').value,
       maintenanceFeeItems: document.getElementById('form_maintenanceFeeItems').value,
       blogLink: document.getElementById('form_blogLink').value,
@@ -775,14 +940,16 @@
     const payload = collectPayload();
     payload.action = payload.id ? "update" : "create";
 
-    if (!payload.address) { alert("소재지 주소를 입력해주세요."); return; }
+    if (!payload.address || !payload.lat || !payload.lng) {
+      alert("먼저 소재지를 입력하고 '위치 확인' 버튼을 눌러 좌표를 계산해주세요.");
+      return;
+    }
 
     fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
       .then(res => res.json())
       .then(res => {
         alert(res.message);
         if (res.success) {
-          if (tempMarker) { tempMarker.setMap(null); tempMarker = null; }
           closeModal();
           loadData();
         }
@@ -803,7 +970,10 @@
       .catch(err => alert("삭제 실패: " + err));
   }
 
-  window.onload = loadData;
+  window.onload = function () {
+    refreshFilterKindOptions();
+    loadData();
+  };
 </script>
 </body>
 </html>
