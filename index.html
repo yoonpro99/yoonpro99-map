@@ -101,7 +101,7 @@
           <option value="주택">주택</option>
         </select>
         <select id="filterKind" onchange="applyFilters()">
-          <option value="">매물종류: 전체</option>
+          <option value="">매물유형상세: 전체</option>
         </select>
         <select id="filterDealType" onchange="applyFilters()">
           <option value="">거래: 전체</option>
@@ -194,7 +194,7 @@
       </select>
     </div>
     <div class="form-group">
-      <label>매물종류</label>
+      <label>매물유형상세</label>
       <select id="form_kind"></select>
     </div>
   </div>
@@ -254,10 +254,14 @@
     <input type="text" id="form_customerSearch" list="customersList" placeholder="고객명 입력" oninput="resolveCustomer()">
     <datalist id="customersList"></datalist>
   </div>
+  <datalist id="occupancyList"><option value="공실"></datalist>
+
+  <div class="section-label" style="margin-top:6px;">공통 추가정보</div>
+  <div id="commonExtraFields"></div>
 
   <div class="form-row price-sale">
     <div class="form-group"><label>매매가</label><input type="text" id="form_price_sale"></div>
-    <div class="form-group"><label>평단가</label><input type="text" id="form_price_per_pyeong"></div>
+    <div class="form-group"><label>평단가</label><input type="text" id="form_price_per_pyeong" disabled placeholder="자동계산"></div>
   </div>
   <div class="form-row price-jeonse">
     <div class="form-group"><label>보증금(전세)</label><input type="text" id="form_deposit_jeonse"></div>
@@ -284,9 +288,7 @@
         <input type="number" id="form_area_land" oninput="updateAreaPreview(this,'pv_area_land')">
         <span class="area-preview" id="pv_area_land"></span>
       </div>
-      <div class="form-group"><label>용도지역</label><input type="text" id="form_landZone"></div>
     </div>
-    <div class="form-group"><label>지구.구역</label><input type="text" id="form_districtZone"></div>
   </div>
 
   <div class="conditional-block" data-type="상가">
@@ -309,13 +311,11 @@
       <span class="area-preview" id="pv_totalFloorArea_1"></span>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>권리금</label><input type="text" id="form_premium"></div>
-      <div class="form-group"><label>입점상태</label><input type="text" id="form_occupancyStatus"></div>
-    </div>
-    <div class="form-row">
+      <div class="form-group"><label>임대현황</label><input type="text" id="form_occupancyStatus" placeholder="예: 공실" list="occupancyList"></div>
       <div class="form-group"><label>현업종</label><input type="text" id="form_currentBiz"></div>
-      <div class="form-group"><label>추천업종</label><input type="text" id="form_recommendBiz"></div>
     </div>
+    <div class="form-group"><label>추천업종</label><input type="text" id="form_recommendBiz"></div>
+    <div id="extra_상가"></div>
   </div>
 
   <div class="conditional-block" data-type="공장창고">
@@ -341,6 +341,7 @@
       <div class="form-group"><label>사용전력</label><input type="text" id="form_powerSupply"></div>
       <div class="form-group"><label>층고</label><input type="text" id="form_ceilingHeight"></div>
     </div>
+    <div id="extra_공장창고"></div>
   </div>
 
   <div class="conditional-block" data-type="주택">
@@ -363,14 +364,18 @@
       <span class="area-preview" id="pv_area_land_3"></span>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>방</label><input type="text" id="form_rooms"></div>
-      <div class="form-group"><label>욕실</label><input type="text" id="form_bathrooms"></div>
+      <div class="form-group"><label>방</label><input type="number" id="form_rooms"></div>
+      <div class="form-group"><label>욕실</label><input type="number" id="form_bathrooms"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>방향</label><input type="text" id="form_direction"></div>
-      <div class="form-group"><label>반려동물</label><input type="text" id="form_pet"></div>
+      <div class="form-group">
+        <label>반려동물</label>
+        <select id="form_pet"><option value=""></option><option value="O">O</option><option value="X">X</option></select>
+      </div>
     </div>
-    <div class="form-group"><label>구조 특징 (복층/다락 등)</label><input type="text" id="form_structureNote"></div>
+    <div id="extra_주택"></div>
+    <div class="form-group"><label>특수메모 (복층/다락 등 기타 특이사항)</label><textarea id="form_structureNote"></textarea></div>
   </div>
 
   <div class="section-label">메모</div>
@@ -405,6 +410,104 @@
   };
 
   const STANDALONE_HOUSE_KINDS = ["단독", "단독다가구", "구옥", "전원농가", "타운하우스"];
+
+  const LANDZONE_OPTIONS = [
+    "1종전용주거", "2종전용주거", "1종일반주거", "2종일반주거", "3종일반주거", "준주거",
+    "보전녹지", "생산녹지", "자연녹지", "보전관리", "생산관리", "계획관리",
+    "중심상업", "일반상업", "근린상업", "유통상업",
+    "전용공업", "일반공업", "준공업"
+  ];
+
+  // ===== 신규 필드 설정 객체 =====
+  // 여기에 필드를 추가/삭제/수정하면 폼이 자동으로 그려집니다. (시트 실시간 조회 방식은 로딩이 느려지고
+  // 에러 지점이 늘어나므로 사용하지 않고, 옵션은 코드에 고정합니다)
+  const FIELD_CONFIG = {
+    // 매물유형(주택/상가/토지/공장창고)과 무관하게 공통으로 쓰이는 추가 필드
+    common: [
+      { key: 'landZone', label: '용도지역', type: 'select', options: LANDZONE_OPTIONS },
+      { key: 'districtZone', label: '지구.구역', type: 'text' },
+      { key: 'premium', label: '권리금', type: 'text' }
+    ],
+    // 매물유형별 전용 필드 (기존 conditional-block 안에 있던 대지/공급/전용 면적 입력은 그대로 유지되고,
+    // 여기 정의된 필드들만 자동 생성되어 각 블록 하단에 추가됩니다)
+    토지: [],
+    // 참고: key는 payload/시트 항목명(공통), domId는 실제 <input> id(유형마다 다른 블록에 있으므로 겹치지 않게 접미사 부여)
+    상가: [
+      { key: 'buildingName', domId: 'buildingName_1', label: '건물명', type: 'text' },
+      { key: 'floorInfo', domId: 'floorInfo_1', label: '해당층/총층', type: 'text' },
+      { key: 'approvalDate', domId: 'approvalDate_1', label: '사용승인일', type: 'date' },
+      { key: 'parking', domId: 'parking_1', label: '주차', type: 'text' }
+    ],
+    공장창고: [
+      { key: 'buildingName', domId: 'buildingName_2', label: '건물명', type: 'text' },
+      { key: 'approvalDate', domId: 'approvalDate_2', label: '사용승인일', type: 'date' },
+      { key: 'occupancyStatus', domId: 'occupancyStatus_2', label: '임대현황', type: 'text', placeholder: '예: 공실' },
+      { key: 'parking', domId: 'parking_2', label: '주차', type: 'text' }
+    ],
+    주택: [
+      { key: 'buildingName', domId: 'buildingName_3', label: '건물명', type: 'text' },
+      { key: 'totalFloorArea', domId: 'totalFloorArea_3', label: '연면적(㎡)', type: 'number', areaPreview: true },
+      { key: 'buildingUnit', domId: 'buildingUnit_3', label: '해당동', type: 'text' },
+      { key: 'floorInfo', domId: 'floorInfo_3', label: '해당층/총층', type: 'text' },
+      { key: 'approvalDate', domId: 'approvalDate_3', label: '사용승인일', type: 'date' },
+      { key: 'households', domId: 'households_3', label: '세대수', type: 'number' },
+      { key: 'parking', domId: 'parking_3', label: '주차', type: 'text' },
+      { key: 'structureType', domId: 'structureType_3', label: '특수구조', type: 'text' },
+      { key: 'structureDetail', domId: 'structureDetail_3', label: '특수구조(상세)', type: 'text' }
+    ]
+  };
+
+  // 설정 배열을 읽어 폼 필드를 자동으로 그려주는 함수 (등록/수정 폼이 동일 구조를 공유)
+  function renderFieldsInto(containerId, fields) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    let row = null;
+    fields.forEach((f, i) => {
+      if (i % 2 === 0) {
+        row = document.createElement('div');
+        row.className = 'form-row';
+        container.appendChild(row);
+      }
+      const group = document.createElement('div');
+      group.className = 'form-group';
+      const id = 'form_' + (f.domId || f.key);
+      let inputHtml;
+      if (f.type === 'select') {
+        inputHtml = '<select id="' + id + '"><option value=""></option>' +
+          f.options.map(o => '<option value="' + o + '">' + o + '</option>').join('') + '</select>';
+      } else if (f.type === 'textarea') {
+        inputHtml = '<textarea id="' + id + '"></textarea>';
+      } else if (f.type === 'date') {
+        inputHtml = '<input type="date" id="' + id + '">';
+      } else if (f.type === 'number') {
+        inputHtml = '<input type="number" id="' + id + '"' +
+          (f.areaPreview ? ' oninput="updateAreaPreview(this,\'pv_' + (f.domId || f.key) + '\')"' : '') + '>';
+      } else {
+        inputHtml = '<input type="text" id="' + id + '"' +
+          (f.placeholder ? ' placeholder="' + f.placeholder + '"' : '') + '>';
+      }
+      group.innerHTML = '<label>' + f.label + '</label>' + inputHtml +
+        (f.areaPreview ? '<span class="area-preview" id="pv_' + (f.domId || f.key) + '"></span>' : '');
+      row.appendChild(group);
+    });
+  }
+
+  function collectConfigFields(fields, payload) {
+    fields.forEach(f => {
+      const el = document.getElementById('form_' + (f.domId || f.key));
+      if (el) payload[f.key] = el.value;
+    });
+  }
+
+  function populateConfigFields(fields, item) {
+    fields.forEach(f => {
+      const el = document.getElementById('form_' + (f.domId || f.key));
+      if (!el) return;
+      el.value = item[f.key] || '';
+      if (f.areaPreview) updateAreaPreview(el, 'pv_' + (f.domId || f.key));
+    });
+  }
 
   // ㎡ -> 평, 소수 첫째자리로 통일
   function toPyeongNum(sqm) {
@@ -534,7 +637,7 @@
     const type = document.getElementById('filterType').value;
     const sel = document.getElementById('filterKind');
     const opts = type ? (KIND_OPTIONS[type] || []) : Object.values(KIND_OPTIONS).flat();
-    sel.innerHTML = '<option value="">매물종류: 전체</option>' + opts.map(o => '<option value="' + o + '">' + o + '</option>').join('');
+    sel.innerHTML = '<option value="">매물유형상세: 전체</option>' + opts.map(o => '<option value="' + o + '">' + o + '</option>').join('');
   }
 
   function parseNum(v) {
@@ -767,50 +870,63 @@
 
     if (item.type === '토지') {
       html += row('권리금', item.premium);
-      html += row('매물종류', item.kind);
+      html += row('매물유형상세', item.kind);
       html += row('용도지역', item.landZone);
       html += row('지구.구역', item.districtZone);
       html += row('대지', toPyeongStr(item.area_land));
       html += row('메모', item.memo);
     } else if (item.type === '상가') {
       html += row('권리금', item.premium);
-      html += row('매물종류', item.kind);
+      html += row('매물유형상세', item.kind);
       html += row('건축물용도', item.buildingUse);
       html += row('연면적', toPyeongStr(item.totalFloorArea));
       html += row('용도지역', item.landZone);
-      html += row('입점상태', item.occupancyStatus);
+      html += row('지구.구역', item.districtZone);
+      html += row('임대현황', item.occupancyStatus);
       html += row('해당층/총층', item.floorInfo);
+      html += row('사용승인일', item.approvalDate);
+      html += row('주차', item.parking);
       html += row('현업종', item.currentBiz);
+      html += row('추천업종', item.recommendBiz);
       html += row('메모', item.memo);
     } else if (item.type === '주택') {
       html += row('건물명', item.buildingName);
       html += row('관리비', maintenanceText(item));
       html += row('방향', item.direction);
-      html += row('매물종류', item.kind);
+      html += row('매물유형상세', item.kind);
       html += row('건축물용도', item.buildingUse);
       html += row('공급/전용', (item.area_supply || item.area_exclusive) ? (toPyeongStr(item.area_supply) || '-') + ' / ' + (toPyeongStr(item.area_exclusive) || '-') : '');
       html += row('연면적', toPyeongStr(item.totalFloorArea));
       html += row('대지', toPyeongStr(item.area_land));
       html += row('용도지역', item.landZone);
+      html += row('지구.구역', item.districtZone);
       html += row('해당동', item.buildingUnit);
       html += row('해당층/총층', item.floorInfo);
+      html += row('사용승인일', item.approvalDate);
+      html += row('세대수', item.households);
+      html += row('주차', item.parking);
       html += row('방/욕실', (item.rooms || item.bathrooms) ? (item.rooms || '-') + '개 / ' + (item.bathrooms || '-') + '개' : '');
-      html += row('구조특징', item.structureNote);
+      html += row('특수구조', [item.structureType, item.structureDetail].filter(v => v).join(' / '));
+      html += row('특수메모', item.structureNote);
       html += row('반려동물', item.pet);
       html += row('메모', item.memo);
     } else if (item.type === '공장창고') {
       html += row('권리금', item.premium);
-      html += row('매물종류', item.kind);
+      html += row('매물유형상세', item.kind);
       html += row('건축물용도', item.buildingUse);
       html += row('연면적', toPyeongStr(item.totalFloorArea));
       html += row('용도지역', item.landZone);
-      html += row('입점상태', item.occupancyStatus);
-      html += row('해당층/총층', item.floorInfo);
-      html += row('현업종', item.currentBiz);
+      html += row('지구.구역', item.districtZone);
+      html += row('임대현황', item.occupancyStatus);
+      html += row('사용승인일', item.approvalDate);
+      html += row('주차', item.parking);
       html += row('사용전력', item.powerSupply);
       html += row('층고', item.ceilingHeight);
       html += row('메모', item.memo);
     }
+    html += row('등록일', item.registeredDate ? item.registeredDate.toString().slice(0,10) : '');
+    html += row('확인일', item.updatedDate ? item.updatedDate.toString().slice(0,10) : '');
+    html += row('현재경과일', item.elapsedDays ? item.elapsedDays + '일' : '');
     return html;
   }
 
@@ -920,7 +1036,7 @@
     document.getElementById('form_customerSearch').value = item.customerName ? (item.customerName + ' (' + item.customerId + ')') : '';
 
     document.getElementById('form_price_sale').value = item.price_sale || '';
-    document.getElementById('form_price_per_pyeong').value = item.price_per_pyeong || '';
+    document.getElementById('form_price_per_pyeong').value = item.price_per_pyeong || ''; // 자동계산값 표시만 (읽기전용)
     document.getElementById('form_deposit_jeonse').value = item.deposit || '';
     document.getElementById('form_deposit_yearly').value = item.deposit || '';
     document.getElementById('form_yearly').value = item.yearly || '';
@@ -930,13 +1046,10 @@
     document.getElementById('form_maintenanceFeeItems').value = item.maintenanceFeeItems || '';
 
     document.getElementById('form_area_land').value = item.area_land || '';
-    document.getElementById('form_landZone').value = item.landZone || '';
-    document.getElementById('form_districtZone').value = item.districtZone || '';
 
     document.getElementById('form_area_supply_1').value = item.area_supply || '';
     document.getElementById('form_area_exclusive_1').value = item.area_exclusive || '';
     document.getElementById('form_totalFloorArea_1').value = item.totalFloorArea || '';
-    document.getElementById('form_premium').value = item.premium || '';
     document.getElementById('form_occupancyStatus').value = item.occupancyStatus || '';
     document.getElementById('form_currentBiz').value = item.currentBiz || '';
     document.getElementById('form_recommendBiz').value = item.recommendBiz || '';
@@ -966,6 +1079,10 @@
 
     document.getElementById('form_blogLink').value = item.blogLink || '';
     document.getElementById('form_memo').value = item.memo || '';
+
+    // 공통/유형별 설정 필드 값도 자동으로 채움 (등록폼과 동일한 구조를 공유하므로 기존값이 그대로 반영됨)
+    populateConfigFields(FIELD_CONFIG.common, item);
+    populateConfigFields(FIELD_CONFIG[item.type] || [], item);
 
     toggleConditionalFields();
     togglePriceFields();
@@ -1003,13 +1120,17 @@
       maintenanceFee: document.getElementById('form_maintenanceFee').value,
       maintenanceFeeItems: document.getElementById('form_maintenanceFeeItems').value,
       blogLink: document.getElementById('form_blogLink').value,
-      memo: document.getElementById('form_memo').value
+      memo: document.getElementById('form_memo').value,
+      buildingUse: document.getElementById('form_kind').value // 건축물용도 = 매물유형상세 값 그대로 자동 반영
     };
+
+    // 공통 추가정보(용도지역/지구.구역/권리금)는 설정 배열 기반으로 일괄 수집
+    collectConfigFields(FIELD_CONFIG.common, payload);
 
     const group = priceGroup(dealType);
     if (group === 'sale') {
       payload.price_sale = document.getElementById('form_price_sale').value;
-      payload.price_per_pyeong = document.getElementById('form_price_per_pyeong').value;
+      // 평단가는 시트 수식이 자동 계산하므로 여기서는 전송하지 않음
     } else if (group === 'jeonse') {
       payload.deposit = document.getElementById('form_deposit_jeonse').value;
     } else if (group === 'yearly') {
@@ -1022,13 +1143,10 @@
 
     if (type === '토지') {
       payload.area_land = document.getElementById('form_area_land').value;
-      payload.landZone = document.getElementById('form_landZone').value;
-      payload.districtZone = document.getElementById('form_districtZone').value;
     } else if (type === '상가') {
       payload.area_supply = document.getElementById('form_area_supply_1').value;
       payload.area_exclusive = document.getElementById('form_area_exclusive_1').value;
       payload.totalFloorArea = document.getElementById('form_totalFloorArea_1').value;
-      payload.premium = document.getElementById('form_premium').value;
       payload.occupancyStatus = document.getElementById('form_occupancyStatus').value;
       payload.currentBiz = document.getElementById('form_currentBiz').value;
       payload.recommendBiz = document.getElementById('form_recommendBiz').value;
@@ -1048,6 +1166,9 @@
       payload.pet = document.getElementById('form_pet').value;
       payload.structureNote = document.getElementById('form_structureNote').value;
     }
+
+    // 유형별 설정 필드(건물명/해당층/사용승인일/주차/세대수/특수구조 등)도 일괄 수집
+    collectConfigFields(FIELD_CONFIG[type] || [], payload);
 
     return payload;
   }
@@ -1085,6 +1206,12 @@
       })
       .catch(err => alert("삭제 실패: " + err));
   }
+
+  // 설정 배열 기반으로 폼 필드 자동 생성 (등록/수정 폼 공통)
+  renderFieldsInto('commonExtraFields', FIELD_CONFIG.common);
+  renderFieldsInto('extra_상가', FIELD_CONFIG.상가);
+  renderFieldsInto('extra_공장창고', FIELD_CONFIG.공장창고);
+  renderFieldsInto('extra_주택', FIELD_CONFIG.주택);
 
   window.onload = function () {
     refreshFilterKindOptions();
