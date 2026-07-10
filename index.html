@@ -46,6 +46,8 @@
   .search-row-main { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
   .search-row-main input, .search-row-main select { padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:white; }
   .search-row-main input[type="text"] { flex:1; min-width:120px; }
+  .search-row-main input#filterAddress { flex:0 0 140px; min-width:100px; }
+  .advanced-search input#filterApprovalFrom, .advanced-search input#filterApprovalTo { flex:0 0 110px; width:110px; min-width:unset; }
   .search-row-main input[type="number"] { width:90px; }
   .search-row-main .tilde { color:#999; font-size:12px; }
   .search-row-main button { padding:6px 12px; border:none; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap; }
@@ -142,12 +144,12 @@
           <option value="premium">권리금</option>
           <option value="price_per_pyeong">평단가</option>
         </select>
-        <input type="number" id="filterRoomsMin" placeholder="방 이상(개)" oninput="applyFilters()">
-        <input type="number" id="filterBathroomsMin" placeholder="욕실 이상(개)" oninput="applyFilters()">
-        <input type="text" id="filterFloor" placeholder="층 검색 (예: 3/5)" oninput="applyFilters()">
-        <input type="date" id="filterApprovalFrom" title="사용승인일 이후" oninput="applyFilters()">
+        <input type="number" id="filterRoomsMin" placeholder="방 이상(개)" min="0" step="1" oninput="applyFilters()">
+        <input type="number" id="filterBathroomsMin" placeholder="욕실 이상(개)" min="0" step="1" oninput="applyFilters()">
+        <input type="text" id="filterFloor" placeholder="해당층 검색 (예: 3)" oninput="applyFilters()">
+        <input type="text" inputmode="numeric" pattern="[0-9]{4}" id="filterApprovalFrom" placeholder="사용승인 연도(from)" title="사용승인일 이후(연도, 4자리)" maxlength="4" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4); applyFilters()">
         <span class="tilde">~</span>
-        <input type="date" id="filterApprovalTo" title="사용승인일 이전" oninput="applyFilters()">
+        <input type="text" inputmode="numeric" pattern="[0-9]{4}" id="filterApprovalTo" placeholder="사용승인 연도(to)" title="사용승인일 이전(연도, 4자리)" maxlength="4" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4); applyFilters()">
         <select id="filterOccupancy" onchange="applyFilters()">
           <option value="">임대현황: 전체</option>
           <option value="공실">공실만</option>
@@ -562,11 +564,13 @@
     const areaMax = parseNum(document.getElementById('filterAreaMax').value);
 
     const priceField = document.getElementById('filterPriceField').value;
-    const roomsMin = parseNum(document.getElementById('filterRoomsMin').value);
-    const bathroomsMin = parseNum(document.getElementById('filterBathroomsMin').value);
+    const roomsMinRaw = parseNum(document.getElementById('filterRoomsMin').value);
+    const roomsMin = roomsMinRaw !== null ? Math.max(0, Math.floor(roomsMinRaw)) : null;
+    const bathroomsMinRaw = parseNum(document.getElementById('filterBathroomsMin').value);
+    const bathroomsMin = bathroomsMinRaw !== null ? Math.max(0, Math.floor(bathroomsMinRaw)) : null;
     const floorKeyword = document.getElementById('filterFloor').value.trim();
-    const approvalFrom = document.getElementById('filterApprovalFrom').value;
-    const approvalTo = document.getElementById('filterApprovalTo').value;
+    const approvalFromYear = parseNum(document.getElementById('filterApprovalFrom').value);
+    const approvalToYear = parseNum(document.getElementById('filterApprovalTo').value);
     const occupancy = document.getElementById('filterOccupancy').value;
 
     return currentData.filter(item => {
@@ -599,13 +603,18 @@
         if (baths === null || baths < bathroomsMin) return false;
       }
 
-      if (floorKeyword && !(item.floorInfo || '').includes(floorKeyword)) return false;
+      if (floorKeyword) {
+        // 해당층/총층 형식(예: "3/5")에서 해당층 부분만 검색 대상으로 사용
+        const currentFloor = (item.floorInfo || '').toString().split('/')[0].trim();
+        if (!currentFloor.includes(floorKeyword)) return false;
+      }
 
-      if (approvalFrom || approvalTo) {
+      if (approvalFromYear !== null || approvalToYear !== null) {
         const ad = item.approvalDate ? new Date(item.approvalDate) : null;
         if (!ad || isNaN(ad.getTime())) return false;
-        if (approvalFrom && ad < new Date(approvalFrom)) return false;
-        if (approvalTo && ad > new Date(approvalTo)) return false;
+        const adYear = ad.getFullYear();
+        if (approvalFromYear !== null && adYear < approvalFromYear) return false;
+        if (approvalToYear !== null && adYear > approvalToYear) return false;
       }
 
       if (occupancy === '공실' && !(item.occupancyStatus || '').includes('공실')) return false;
