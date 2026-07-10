@@ -11,17 +11,9 @@
   .sidebar { width: 380px; height: 100%; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; background: #fff; z-index: 10; }
   .sidebar-header { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
   .sidebar-header h2 { margin: 0 0 10px 0; font-size: 17px; color: #333; }
-  .sidebar-header .count { font-size: 12px; color: #888; margin-top:6px; }
+  .sidebar-header .count { font-size: 12px; color: #888; margin-top:8px; }
   .btn-new { width:100%; padding:10px; background:#00a844; color:white; border:none; border-radius:6px; font-weight:bold; font-size:13px; cursor:pointer; }
   .btn-new:hover { background:#009440; }
-  .btn-row-3 { display:flex; gap:6px; }
-  .btn-row-3 button { flex:1; padding:9px 0; border:none; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; }
-  .btn-new { background:#00a844; color:white; }
-  .btn-reset { background:#f0f0f0; color:#555; }
-  .btn-search { background:#3a6bd8; color:white; }
-  .advanced-search { margin-top:8px; padding:8px; background:#f7f8fa; border-radius:6px; }
-  .filter-row { display:flex; gap:6px; margin-top:10px; }
-  .filter-row select { flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px; background:white; }
   .list-container { flex: 1; overflow-y: auto; }
   .item-card { padding: 14px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
   .item-card:hover { background: #f9f9f9; }
@@ -47,14 +39,20 @@
   .info-row .v { color:#222; flex:1; }
   .info-btn-area { display:flex; gap:8px; margin-top:16px; }
 
-  .map-area { flex: 1; height: 100%; position: relative; }
-  #map { width: 100%; height: 100%; }
+  .map-area { flex: 1; height: 100%; position: relative; display:flex; flex-direction:column; }
+  #map { flex:1; width: 100%; }
 
-  .confirm-bar { display:none; position:absolute; top:14px; left:50%; transform:translateX(-50%); background:white; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,0.2); padding:12px 16px; z-index:50; text-align:center; max-width:90%; }
-  .confirm-bar .msg { font-size:13px; color:#333; margin-bottom:8px; }
-  .confirm-bar .btn { padding:6px 14px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:12px; margin:0 4px; }
-  .confirm-bar .btn-go { background:#00a844; color:white; }
-  .confirm-bar .btn-stop { background:#f0f0f0; color:#333; }
+  .map-search-bar { background:white; border-bottom:1px solid #e0e0e0; padding:8px 12px; z-index:20; }
+  .search-row-main { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .search-row-main input, .search-row-main select { padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:white; }
+  .search-row-main input[type="text"] { flex:1; min-width:120px; }
+  .search-row-main input[type="number"] { width:90px; }
+  .search-row-main .tilde { color:#999; font-size:12px; }
+  .search-row-main button { padding:6px 12px; border:none; border-radius:4px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap; }
+  .btn-search { background:#3a6bd8; color:white; }
+  .btn-reset { background:#f0f0f0; color:#555; }
+  .advanced-search { display:flex; gap:6px; flex-wrap:wrap; padding-top:8px; margin-top:8px; border-top:1px dashed #eee; }
+  .advanced-search select, .advanced-search input { padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; flex:1; min-width:130px; }
 
   .modal-overlay { display:none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index: 1999; }
   .modal { display:none; position: fixed; top:50%; left:50%; transform: translate(-50%,-50%); background:white; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.25); z-index:2000; width:420px; max-height:85vh; overflow-y:auto; padding:22px; }
@@ -69,6 +67,7 @@
   .form-group textarea { resize:vertical; min-height:50px; }
   .section-label { font-size:12px; font-weight:bold; color:#00a844; margin:16px 0 8px; padding-top:10px; border-top:1px solid #f0f0f0; }
   .conditional-block { display:none; }
+  .area-preview { display:block; font-size:11px; color:#3a6bd8; margin-top:2px; }
   .btn-area { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
   .btn { padding:8px 16px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:13px; }
   .btn-submit { background:#00a844; color:white; }
@@ -82,44 +81,16 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <h2>매물 목록</h2>
-      <div class="btn-row-3">
-        <button class="btn-new" onclick="startRegister()">신규</button>
-        <button class="btn-reset" onclick="resetFilters()">초기화</button>
-        <button class="btn-search" onclick="toggleAdvancedSearch()">검색</button>
-      </div>
-      <div class="advanced-search" id="advancedSearch" style="display:none;">
-        <div class="form-row" style="margin-bottom:6px;">
-          <select id="filterKind" onchange="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
-            <option value="">매물종류: 전체</option>
-          </select>
-          <select id="filterPriceField" onchange="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
-            <option value="">가격기준: 자동(거래유형)</option>
-            <option value="price_sale">매매가</option>
-            <option value="deposit">보증금</option>
-            <option value="yearly">연세</option>
-            <option value="monthly">월세</option>
-            <option value="premium">권리금</option>
-            <option value="price_per_pyeong">평단가</option>
-          </select>
-        </div>
-        <div class="form-row" style="margin-bottom:6px;">
-          <input type="number" id="filterLandMin" placeholder="대지(평) 최소" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
-          <input type="number" id="filterLandMax" placeholder="대지(평) 최대" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
-        </div>
-        <div class="form-row">
-          <input type="number" id="filterRoomsMin" placeholder="방 이상(개)" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
-          <select id="filterPet" onchange="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
-            <option value="">반려동물: 전체</option>
-            <option value="가능">가능</option>
-            <option value="불가">불가</option>
-            <option value="협의">협의</option>
-          </select>
-        </div>
-      </div>
-      <div class="filter-row">
-        <input type="text" id="filterAddress" placeholder="소재지 검색 (예: 남원읍)" oninput="applyFilters()" style="flex:1; padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
-      </div>
-      <div class="filter-row">
+      <button class="btn-new" style="width:100%;" onclick="startRegister()">+ 신규 매물 등록</button>
+      <div class="count" id="listCount">불러오는 중...</div>
+    </div>
+    <div class="list-container" id="itemList"></div>
+  </div>
+
+  <div class="map-area">
+    <div class="map-search-bar">
+      <div class="search-row-main">
+        <input type="text" id="filterAddress" placeholder="소재지 검색 (예: 남원읍)" oninput="applyFilters()">
         <select id="filterType" onchange="refreshFilterKindOptions(); applyFilters()">
           <option value="">유형: 전체</option>
           <option value="토지">토지</option>
@@ -127,14 +98,8 @@
           <option value="공장창고">공장창고</option>
           <option value="주택">주택</option>
         </select>
-        <select id="filterStatus" onchange="applyFilters()">
-          <option value="">상태: 전체</option>
-          <option value="1.광고중" selected>1.광고중</option>
-          <option value="2.문의중">2.문의중</option>
-          <option value="3.협의중">3.협의중</option>
-          <option value="4.계약완료">4.계약완료</option>
-          <option value="5.보류">5.보류</option>
-          <option value="6.종료">6.종료</option>
+        <select id="filterKind" onchange="applyFilters()">
+          <option value="">매물종류: 전체</option>
         </select>
         <select id="filterDealType" onchange="applyFilters()">
           <option value="">거래: 전체</option>
@@ -149,18 +114,47 @@
           <option value="임차 월세">임차 월세</option>
           <option value="임차 단기">임차 단기</option>
         </select>
+        <select id="filterStatus" onchange="applyFilters()">
+          <option value="">상태: 전체</option>
+          <option value="1.광고중" selected>1.광고중</option>
+          <option value="2.문의중">2.문의중</option>
+          <option value="3.협의중">3.협의중</option>
+          <option value="4.계약완료">4.계약완료</option>
+          <option value="5.보류">5.보류</option>
+          <option value="6.종료">6.종료</option>
+        </select>
+        <input type="number" id="filterMinPrice" placeholder="최소금액" oninput="applyFilters()">
+        <span class="tilde">~</span>
+        <input type="number" id="filterMaxPrice" placeholder="최대금액" oninput="applyFilters()">
+        <input type="number" id="filterAreaMin" placeholder="면적(평) 최소" oninput="applyFilters()">
+        <span class="tilde">~</span>
+        <input type="number" id="filterAreaMax" placeholder="면적(평) 최대" oninput="applyFilters()">
+        <button class="btn-search" onclick="toggleAdvancedSearch()">상세 ▾</button>
+        <button class="btn-reset" onclick="resetFilters()">초기화</button>
       </div>
-      <div class="filter-row">
-        <input type="number" id="filterMinPrice" placeholder="최소금액" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
-        <span style="align-self:center; font-size:11px; color:#999;">~</span>
-        <input type="number" id="filterMaxPrice" placeholder="최대금액" oninput="applyFilters()" style="flex:1; padding:6px 4px; border:1px solid #ddd; border-radius:4px; font-size:11px;">
+      <div class="advanced-search" id="advancedSearch" style="display:none;">
+        <select id="filterPriceField" onchange="applyFilters()">
+          <option value="">가격기준: 자동(거래유형)</option>
+          <option value="price_sale">매매가</option>
+          <option value="deposit">보증금</option>
+          <option value="yearly">연세</option>
+          <option value="monthly">월세</option>
+          <option value="premium">권리금</option>
+          <option value="price_per_pyeong">평단가</option>
+        </select>
+        <input type="number" id="filterRoomsMin" placeholder="방 이상(개)" oninput="applyFilters()">
+        <input type="number" id="filterBathroomsMin" placeholder="욕실 이상(개)" oninput="applyFilters()">
+        <input type="text" id="filterFloor" placeholder="층 검색 (예: 3/5)" oninput="applyFilters()">
+        <input type="date" id="filterApprovalFrom" title="사용승인일 이후" oninput="applyFilters()">
+        <span class="tilde">~</span>
+        <input type="date" id="filterApprovalTo" title="사용승인일 이전" oninput="applyFilters()">
+        <select id="filterOccupancy" onchange="applyFilters()">
+          <option value="">임대현황: 전체</option>
+          <option value="공실">공실만</option>
+          <option value="기타">기타(임대중 등)</option>
+        </select>
       </div>
-      <div class="count" id="listCount">불러오는 중...</div>
     </div>
-    <div class="list-container" id="itemList"></div>
-  </div>
-
-  <div class="map-area">
     <div id="map"></div>
   </div>
 </div>
@@ -283,7 +277,11 @@
   <div class="conditional-block" data-type="토지">
     <div class="section-label">토지 정보</div>
     <div class="form-row">
-      <div class="form-group"><label>대지(평)</label><input type="text" id="form_area_land"></div>
+      <div class="form-group">
+        <label>대지(㎡)</label>
+        <input type="number" id="form_area_land" oninput="updateAreaPreview(this,'pv_area_land')">
+        <span class="area-preview" id="pv_area_land"></span>
+      </div>
       <div class="form-group"><label>용도지역</label><input type="text" id="form_landZone"></div>
     </div>
     <div class="form-group"><label>지구.구역</label><input type="text" id="form_districtZone"></div>
@@ -292,8 +290,21 @@
   <div class="conditional-block" data-type="상가">
     <div class="section-label">상가 정보</div>
     <div class="form-row">
-      <div class="form-group"><label>공급(평)</label><input type="text" id="form_area_supply_1"></div>
-      <div class="form-group"><label>전용(평)</label><input type="text" id="form_area_exclusive_1"></div>
+      <div class="form-group">
+        <label>공급(㎡)</label>
+        <input type="number" id="form_area_supply_1" oninput="updateAreaPreview(this,'pv_area_supply_1')">
+        <span class="area-preview" id="pv_area_supply_1"></span>
+      </div>
+      <div class="form-group">
+        <label>전용(㎡)</label>
+        <input type="number" id="form_area_exclusive_1" oninput="updateAreaPreview(this,'pv_area_exclusive_1')">
+        <span class="area-preview" id="pv_area_exclusive_1"></span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>연면적(㎡)</label>
+      <input type="number" id="form_totalFloorArea_1" oninput="updateAreaPreview(this,'pv_totalFloorArea_1')">
+      <span class="area-preview" id="pv_totalFloorArea_1"></span>
     </div>
     <div class="form-row">
       <div class="form-group"><label>권리금</label><input type="text" id="form_premium"></div>
@@ -308,8 +319,21 @@
   <div class="conditional-block" data-type="공장창고">
     <div class="section-label">공장창고 정보</div>
     <div class="form-row">
-      <div class="form-group"><label>대지(평)</label><input type="text" id="form_area_land_2"></div>
-      <div class="form-group"><label>공급/전용(평)</label><input type="text" id="form_area_supply_2"></div>
+      <div class="form-group">
+        <label>대지(㎡)</label>
+        <input type="number" id="form_area_land_2" oninput="updateAreaPreview(this,'pv_area_land_2')">
+        <span class="area-preview" id="pv_area_land_2"></span>
+      </div>
+      <div class="form-group">
+        <label>공급(㎡)</label>
+        <input type="number" id="form_area_supply_2" oninput="updateAreaPreview(this,'pv_area_supply_2')">
+        <span class="area-preview" id="pv_area_supply_2"></span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>연면적(㎡)</label>
+      <input type="number" id="form_totalFloorArea_2" oninput="updateAreaPreview(this,'pv_totalFloorArea_2')">
+      <span class="area-preview" id="pv_totalFloorArea_2"></span>
     </div>
     <div class="form-row">
       <div class="form-group"><label>사용전력</label><input type="text" id="form_powerSupply"></div>
@@ -320,8 +344,21 @@
   <div class="conditional-block" data-type="주택">
     <div class="section-label">주택 정보</div>
     <div class="form-row">
-      <div class="form-group"><label>공급(평)</label><input type="text" id="form_area_supply_3"></div>
-      <div class="form-group"><label>전용(평)</label><input type="text" id="form_area_exclusive_3"></div>
+      <div class="form-group">
+        <label>공급(㎡)</label>
+        <input type="number" id="form_area_supply_3" oninput="updateAreaPreview(this,'pv_area_supply_3')">
+        <span class="area-preview" id="pv_area_supply_3"></span>
+      </div>
+      <div class="form-group">
+        <label>전용(㎡)</label>
+        <input type="number" id="form_area_exclusive_3" oninput="updateAreaPreview(this,'pv_area_exclusive_3')">
+        <span class="area-preview" id="pv_area_exclusive_3"></span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>대지(㎡, 단독·전원주택 등)</label>
+      <input type="number" id="form_area_land_3" oninput="updateAreaPreview(this,'pv_area_land_3')">
+      <span class="area-preview" id="pv_area_land_3"></span>
     </div>
     <div class="form-row">
       <div class="form-group"><label>방</label><input type="text" id="form_rooms"></div>
@@ -349,13 +386,14 @@
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=3e39f7248f3829204f5bd2ef0cf24e94&libraries=services"></script>
 <script>
   // 아래 값들을 본인 환경(테스트 시트=map_test_1 기준)에 맞게 채워주세요
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyZnPKyrbgpgFb3TOSgrwcHW-Qy82y6NJg6E-eho6f_CT2F8K4J3SeAzCsJxumkV7x3/exec";
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbxf6cRCBH_Yv4tGRCnRwFw0LOM0qifuDy7chw_br4kEui3jbcGKBVY9EptVLwbczAan/exec";
   const API_TOKEN = "5cd3f57f-c988-4ed2-ad70-00b304dad31f";
+
 
   let map, markers = [], currentData = [], currentCustomers = [];
   const geocoder = new kakao.maps.services.Geocoder();
 
-  const LOCATIONS = ["서귀포시 강정동", "서귀포시 남원읍 남원리", "서귀포시 남원읍 위미리", "서귀포시 남원읍 태흥리", "서귀포시 대정읍 구억리", "서귀포시 대정읍 동일리", "서귀포시 대정읍 무릉리", "서귀포시 대정읍 보성리", "서귀포시 대정읍 신도리", "서귀포시 대정읍 일과리", "서귀포시 동홍동", "서귀포시 상예동", "서귀포시 서귀동", "서귀포시 서호동", "서귀포시 서홍동", "서귀포시 호근동", "서귀포시 성산읍 고성리", "서귀포시 성산읍 난산리", "서귀포시 성산읍 삼달리", "서귀포시 성산읍 성산리", "서귀포시 성산읍 수산리", "서귀포시 성산읍 시흥리", "서귀포시 성산읍 신산리", "서귀포시 성산읍 신천리", "서귀포시 성산읍 신풍리", "서귀포시 성산읍 오조리", "서귀포시 성산읍 온평리", "서귀포시 안덕면 감산리", "서귀포시 안덕면 덕수리", "서귀포시 안덕면 동광리", "서귀포시 안덕면 사계리", "서귀포시 안덕면 상창리", "서귀포시 안덕면 서광리", "서귀포시 안덕면 창천리", "서귀포시 안덕면 화순리", "서귀포시 중문동", "서귀포시 표선면 가시리", "서귀포시 표선면 성읍리", "서귀포시 표선면 세화리", "서귀포시 표선면 토산리", "서귀포시 표선면 표선리", "서귀포시 표선면 하천리", "서귀포시 하효동", "서귀포시 회수동", "제주시 건입동", "제주시 구좌읍 김녕리", "제주시 구좌읍 동복리", "제주시 구좌읍 상도리", "제주시 구좌읍 세화리", "제주시 구좌읍 송당리", "제주시 구좌읍 월정리", "제주시 구좌읍 종달리", "제주시 구좌읍 평대리", "제주시 구좌읍 하도리", "제주시 구좌읍 한동리", "제주시 구좌읍 행원리", "제주시 내도동", "제주시 노형동", "제주시 도남동", "제주시 도두이동", "제주시 도두일동", "제주시 도련이동", "제주시 도련일동", "제주시 도평동", "제주시 봉개동", "제주시 삼도이동", "제주시 삼도일동", "제주시 삼양동", "제주시 삼양삼동", "제주시 삼양이동", "제주시 삼양일동", "제주시 아라이동", "제주시 아라일동", "제주시 애월읍 고내리", "제주시 애월읍 고성리", "제주시 애월읍 곽지리", "제주시 애월읍 광령리", "제주시 애월읍 구엄리", "제주시 애월읍 금성리", "제주시 애월읍 납읍리", "제주시 애월읍 봉성리", "제주시 애월읍 상가리", "제주시 애월읍 상귀리", "제주시 애월읍 소길리", "제주시 애월읍 수산리", "제주시 애월읍 신엄리", "제주시 애월읍 애월리", "제주시 애월읍 어음리", "제주시 애월읍 유수암리", "제주시 애월읍 장전리", "제주시 애월읍 하가리", "제주시 애월읍 하귀1리", "제주시 애월읍 하귀2리", "제주시 연동", "제주시 영평동", "제주시 오등동", "제주시 오라삼동", "제주시 오라이동", "제주시 오라일동", "제주시 외도이동", "제주시 외도일동", "제주시 용강동", "제주시 용담삼동", "제주시 용담이동", "제주시 용담일동", "제주시 우도면", "제주시 월평동", "제주시 이도이동", "제주시 이도일동", "제주시 이호이동", "제주시 이호일동", "제주시 일도이동", "제주시 일도일동", "제주시 조천읍 교래리", "제주시 조천읍 대흘리", "제주시 조천읍 북촌리", "제주시 조천읍 선흘리", "제주시 조천읍 신촌리", "제주시 조천읍 신흥리", "제주시 조천읍 와산리", "제주시 조천읍 와흘리", "제주시 조천읍 조천리", "제주시 조천읍 함덕리", "제주시 추자면", "제주시 한경면 고산리", "제주시 한경면 금등리", "제주시 한경면 낙천리", "제주시 한경면 두모리", "제주시 한경면 신창리", "제주시 한경면 용수리", "제주시 한경면 저지리", "제주시 한경면 조수리", "제주시 한경면 청수리", "제주시 한경면 판포리", "제주시 한림읍 귀덕리", "제주시 한림읍 금능리", "제주시 한림읍 금악리", "제주시 한림읍 대림리", "제주시 한림읍 동명리", "제주시 한림읍 명월리", "제주시 한림읍 상대리", "제주시 한림읍 상명리", "제주시 한림읍 수원리", "제주시 한림읍 옹포리", "제주시 한림읍 월령리", "제주시 한림읍 월림리", "제주시 한림읍 한림리", "제주시 한림읍 한수리", "제주시 한림읍 협재리", "제주시 해안동", "제주시 화북이동", "제주시 화북일동", "제주시 회천동"];
+  const LOCATIONS = ["서귀포시 강정동", "서귀포시 남원읍 남원리", "서귀포시 남원읍 위미리", "서귀포시 남원읍 태흥리", "서귀포시 대정읍 구억리", "서귀포시 대정읍 동일리", "서귀포시 대정읍 무릉리", "서귀포시 대정읍 보성리", "서귀포시 대정읍 신도리", "서귀포시 대정읍 일과리", "서귀포시 동홍동", "서귀포시 상예동", "서귀포시 서귀동", "서귀포시 서호동", "서귀포시 서홍동", "서귀포시 호근동", "서귀포시 성산읍 고성리", "서귀포시 성산읍 난산리", "서귀포시 성산읍 삼달리", "서귀포시 성산읍 성산리", "서귀포시 성산읍 수산리", "서귀포시 성산읍 시흥리", "서귀포시 성산읍 신산리", "서귀포시 성산읍 신천리", "서귀포시 성산읍 신풍리", "서귀포시 성산읍 오조리", "서귀포시 성산읍 온평리", "서귀포시 안덕면 감산리", "서귀포시 안덕면 덕수리", "서귀포시 안덕면 동광리", "서귀포시 안덕면 사계리", "서귀포시 안덕면 상창리", "서귀포시 안덕면 서광리", "서귀포시 안덕면 창천리", "서귀포시 안덕면 화순리", "서귀포시 중문동", "서귀포시 표선면 가시리", "서귀포시 표선면 성읍리", "서귀포시 표선면 세화리", "서귀포시 표선면 토산리", "서귀포시 표선면 표선리", "서귀포시 표선읍면 하천리", "서귀포시 하효동", "서귀포시 회수동", "제주시 건입동", "제주시 구좌읍 김녕리", "제주시 구좌읍 동복리", "제주시 구좌읍 상도리", "제주시 구좌읍 세화리", "제주시 구좌읍 송당리", "제주시 구좌읍 월정리", "제주시 구좌읍 종달리", "제주시 구좌읍 평대리", "제주시 구좌읍 하도리", "제주시 구좌읍 한동리", "제주시 구좌읍 행원리", "제주시 내도동", "제주시 노형동", "제주시 도남동", "제주시 도두이동", "제주시 도두일동", "제주시 도련이동", "제주시 도련일동", "제주시 도평동", "제주시 봉개동", "제주시 삼도이동", "제주시 삼도일동", "제주시 삼양동", "제주시 삼양삼동", "제주시 삼양이동", "제주시 삼양일동", "제주시 아라이동", "제주시 아라일동", "제주시 애월읍 고내리", "제주시 애월읍 고성리", "제주시 애월읍 곽지리", "제주시 애월읍 광령리", "제주시 애월읍 구엄리", "제주시 애월읍 금성리", "제주시 애월읍 납읍리", "제주시 애월읍 봉성리", "제주시 애월읍 상가리", "제주시 애월읍 상귀리", "제주시 애월읍 소길리", "제주시 애월읍 수산리", "제주시 애월읍 신엄리", "제주시 애월읍 애월리", "제주시 애월읍 어음리", "제주시 애월읍 유수암리", "제주시 애월읍 장전리", "제주시 애월읍 하가리", "제주시 애월읍 하귀1리", "제주시 애월읍 하귀2리", "제주시 연동", "제주시 영평동", "제주시 오등동", "제주시 오라삼동", "제주시 오라이동", "제주시 오라일동", "제주시 외도이동", "제주시 외도일동", "제주시 용강동", "제주시 용담삼동", "제주시 용담이동", "제주시 용담일동", "제주시 우도면", "제주시 월평동", "제주시 이도이동", "제주시 이도일동", "제주시 이호이동", "제주시 이호일동", "제주시 일도이동", "제주시 일도일동", "제주시 조천읍 교래리", "제주시 조천읍 대흘리", "제주시 조천읍 북촌리", "제주시 조천읍 선흘리", "제주시 조천읍 신촌리", "제주시 조천읍 신흥리", "제주시 조천읍 와산리", "제주시 조천읍 와흘리", "제주시 조천읍 조천리", "제주시 조천읍 함덕리", "제주시 추자면", "제주시 한경면 고산리", "제주시 한경면 금등리", "제주시 한경면 낙천리", "제주시 한경면 두모리", "제주시 한경면 신창리", "제주시 한경면 용수리", "제주시 한경면 저지리", "제주시 한경면 조수리", "제주시 한경면 청수리", "제주시 한경면 판포리", "제주시 한림읍 귀덕리", "제주시 한림읍 금능리", "제주시 한림읍 금악리", "제주시 한림읍 대림리", "제주시 한림읍 동명리", "제주시 한림읍 명월리", "제주시 한림읍 상대리", "제주시 한림읍 상명리", "제주시 한림읍 수원리", "제주시 한림읍 옹포리", "제주시 한림읍 월령리", "제주시 한림읍 월림리", "제주시 한림읍 한림리", "제주시 한림읍 한수리", "제주시 한림읍 협재리", "제주시 해안동", "제주시 화북이동", "제주시 화북일동", "제주시 회천동"];
 
   const KIND_OPTIONS = {
     '주택': ["원룸", "2룸", "3룸", "단독", "단독다가구", "구옥", "전원농가", "타운하우스", "아파트", "빌라", "연립", "다세대", "오피스텔", "생활숙박시설"],
@@ -363,6 +401,36 @@
     '토지': ["전", "답", "과수원", "임야", "대지", "잡종지", "목장용지"],
     '공장창고': ["공장", "창고", "야적장", "지식산업센터"]
   };
+
+  const STANDALONE_HOUSE_KINDS = ["단독", "단독다가구", "구옥", "전원농가", "타운하우스"];
+
+  // ㎡ -> 평, 소수 첫째자리로 통일
+  function toPyeongNum(sqm) {
+    const n = parseFloat(sqm);
+    if (isNaN(n)) return null;
+    return Math.round((n / 3.3058) * 10) / 10;
+  }
+  function toPyeongStr(sqm) {
+    const p = toPyeongNum(sqm);
+    return (p === null) ? '' : p.toFixed(1) + '평';
+  }
+
+  // 매물유형/매물종류에 따라 검색 시 사용할 면적 필드 자동 판별
+  function primaryAreaField(item) {
+    if (item.type === '토지') return 'area_land';
+    if (item.type === '주택') return STANDALONE_HOUSE_KINDS.indexOf(item.kind) !== -1 ? 'area_land' : 'area_exclusive';
+    if (item.type === '상가') return item.area_exclusive ? 'area_exclusive' : 'totalFloorArea';
+    if (item.type === '공장창고') return 'totalFloorArea';
+    return 'area_exclusive';
+  }
+  function itemPrimaryAreaPyeong(item) {
+    return toPyeongNum(item[primaryAreaField(item)]);
+  }
+
+  function updateAreaPreview(inputEl, previewId) {
+    const p = toPyeongNum(inputEl.value);
+    document.getElementById(previewId).innerText = (p !== null) ? '≈ ' + p.toFixed(1) + '평' : '';
+  }
 
   document.getElementById('locationsList').innerHTML = LOCATIONS.map(l => '<option value="' + l + '">').join('');
   const MARKER_COLORS = { '토지': '#000000', '주택': '#9C27B0', '상가': '#F44336', '공장창고': '#2196F3' };
@@ -486,16 +554,20 @@
     const status = document.getElementById('filterStatus').value;
     const dealType = document.getElementById('filterDealType').value;
     const type = document.getElementById('filterType').value;
+    const kind = document.getElementById('filterKind').value;
     const addressKeyword = document.getElementById('filterAddress').value.trim();
     const minPrice = parseNum(document.getElementById('filterMinPrice').value);
     const maxPrice = parseNum(document.getElementById('filterMaxPrice').value);
+    const areaMin = parseNum(document.getElementById('filterAreaMin').value);
+    const areaMax = parseNum(document.getElementById('filterAreaMax').value);
 
-    const kind = document.getElementById('filterKind').value;
     const priceField = document.getElementById('filterPriceField').value;
-    const landMin = parseNum(document.getElementById('filterLandMin').value);
-    const landMax = parseNum(document.getElementById('filterLandMax').value);
     const roomsMin = parseNum(document.getElementById('filterRoomsMin').value);
-    const pet = document.getElementById('filterPet').value;
+    const bathroomsMin = parseNum(document.getElementById('filterBathroomsMin').value);
+    const floorKeyword = document.getElementById('filterFloor').value.trim();
+    const approvalFrom = document.getElementById('filterApprovalFrom').value;
+    const approvalTo = document.getElementById('filterApprovalTo').value;
+    const occupancy = document.getElementById('filterOccupancy').value;
 
     return currentData.filter(item => {
       if (status && item.status !== status) return false;
@@ -511,19 +583,33 @@
         if (maxPrice !== null && p > maxPrice) return false;
       }
 
-      if (landMin !== null || landMax !== null) {
-        const land = parseNum(item.area_land);
-        if (land === null) return false;
-        if (landMin !== null && land < landMin) return false;
-        if (landMax !== null && land > landMax) return false;
+      if (areaMin !== null || areaMax !== null) {
+        const areaPyeong = itemPrimaryAreaPyeong(item);
+        if (areaPyeong === null) return false; // 면적 정보 없는 매물은 범위 필터 걸면 제외
+        if (areaMin !== null && areaPyeong < areaMin) return false;
+        if (areaMax !== null && areaPyeong > areaMax) return false;
       }
 
       if (roomsMin !== null) {
         const rooms = parseNum(item.rooms);
         if (rooms === null || rooms < roomsMin) return false;
       }
+      if (bathroomsMin !== null) {
+        const baths = parseNum(item.bathrooms);
+        if (baths === null || baths < bathroomsMin) return false;
+      }
 
-      if (pet && !(item.pet || '').includes(pet)) return false;
+      if (floorKeyword && !(item.floorInfo || '').includes(floorKeyword)) return false;
+
+      if (approvalFrom || approvalTo) {
+        const ad = item.approvalDate ? new Date(item.approvalDate) : null;
+        if (!ad || isNaN(ad.getTime())) return false;
+        if (approvalFrom && ad < new Date(approvalFrom)) return false;
+        if (approvalTo && ad > new Date(approvalTo)) return false;
+      }
+
+      if (occupancy === '공실' && !(item.occupancyStatus || '').includes('공실')) return false;
+      if (occupancy === '기타' && (item.occupancyStatus || '').includes('공실')) return false;
 
       return true;
     });
@@ -565,10 +651,12 @@
   }
 
   function typeSummary(item) {
-    if (item.type === '토지') return '대지 ' + (item.area_land || '-') + '평';
-    if (item.type === '상가') return '전용 ' + (item.area_exclusive || '-') + '평 · ' + (item.currentBiz || '업종미정');
-    if (item.type === '공장창고') return '대지 ' + (item.area_land || '-') + '평 · 층고 ' + (item.ceilingHeight || '-');
-    if (item.type === '주택') return (item.rooms || '-') + '방 ' + (item.bathrooms || '-') + '욕실 · 전용 ' + (item.area_exclusive || '-') + '평';
+    const areaPyeong = itemPrimaryAreaPyeong(item);
+    const areaStr = (areaPyeong !== null) ? areaPyeong.toFixed(1) + '평' : '-';
+    if (item.type === '토지') return '대지 ' + areaStr;
+    if (item.type === '상가') return '전용 ' + areaStr + ' · ' + (item.currentBiz || '업종미정');
+    if (item.type === '공장창고') return '연면적 ' + areaStr + ' · 층고 ' + (item.ceilingHeight || '-');
+    if (item.type === '주택') return (item.rooms || '-') + '방 ' + (item.bathrooms || '-') + '욕실 · ' + areaStr;
     return '';
   }
 
@@ -599,7 +687,7 @@
     });
   }
 
-  // ===== 신규 등록 흐름: 버튼 -> 주소입력 -> 지오코딩 -> 핀 확인/조정 -> 폼 =====
+  // ===== 신규 등록 흐름: 버튼 -> 폼 바로 열기 =====
   function resetFilters() {
     document.getElementById('filterAddress').value = '';
     document.getElementById('filterType').value = '';
@@ -607,12 +695,16 @@
     document.getElementById('filterDealType').value = '';
     document.getElementById('filterMinPrice').value = '';
     document.getElementById('filterMaxPrice').value = '';
+    document.getElementById('filterAreaMin').value = '';
+    document.getElementById('filterAreaMax').value = '';
     document.getElementById('filterKind').value = '';
     document.getElementById('filterPriceField').value = '';
-    document.getElementById('filterLandMin').value = '';
-    document.getElementById('filterLandMax').value = '';
     document.getElementById('filterRoomsMin').value = '';
-    document.getElementById('filterPet').value = '';
+    document.getElementById('filterBathroomsMin').value = '';
+    document.getElementById('filterFloor').value = '';
+    document.getElementById('filterApprovalFrom').value = '';
+    document.getElementById('filterApprovalTo').value = '';
+    document.getElementById('filterOccupancy').value = '';
     refreshFilterKindOptions();
     applyFilters();
   }
@@ -669,13 +761,13 @@
       html += row('매물종류', item.kind);
       html += row('용도지역', item.landZone);
       html += row('지구.구역', item.districtZone);
-      html += row('대지', item.area_land ? item.area_land + '평' : '');
+      html += row('대지', toPyeongStr(item.area_land));
       html += row('메모', item.memo);
     } else if (item.type === '상가') {
       html += row('권리금', item.premium);
       html += row('매물종류', item.kind);
       html += row('건축물용도', item.buildingUse);
-      html += row('연면적', item.totalFloorArea ? item.totalFloorArea + '평' : '');
+      html += row('연면적', toPyeongStr(item.totalFloorArea));
       html += row('용도지역', item.landZone);
       html += row('입점상태', item.occupancyStatus);
       html += row('해당층/총층', item.floorInfo);
@@ -687,9 +779,9 @@
       html += row('방향', item.direction);
       html += row('매물종류', item.kind);
       html += row('건축물용도', item.buildingUse);
-      html += row('공급/전용', (item.area_supply || item.area_exclusive) ? (item.area_supply || '-') + '평 / ' + (item.area_exclusive || '-') + '평' : '');
-      html += row('연면적', item.totalFloorArea ? item.totalFloorArea + '평' : '');
-      html += row('대지', item.area_land ? item.area_land + '평' : '');
+      html += row('공급/전용', (item.area_supply || item.area_exclusive) ? (toPyeongStr(item.area_supply) || '-') + ' / ' + (toPyeongStr(item.area_exclusive) || '-') : '');
+      html += row('연면적', toPyeongStr(item.totalFloorArea));
+      html += row('대지', toPyeongStr(item.area_land));
       html += row('용도지역', item.landZone);
       html += row('해당동', item.buildingUnit);
       html += row('해당층/총층', item.floorInfo);
@@ -701,7 +793,7 @@
       html += row('권리금', item.premium);
       html += row('매물종류', item.kind);
       html += row('건축물용도', item.buildingUse);
-      html += row('연면적', item.totalFloorArea ? item.totalFloorArea + '평' : '');
+      html += row('연면적', toPyeongStr(item.totalFloorArea));
       html += row('용도지역', item.landZone);
       html += row('입점상태', item.occupancyStatus);
       html += row('해당층/총층', item.floorInfo);
@@ -775,6 +867,7 @@
     document.querySelectorAll('.modal input, .modal textarea, .modal select').forEach(el => {
       if (el.type === 'checkbox') el.checked = false; else el.value = '';
     });
+    document.querySelectorAll('.area-preview').forEach(el => el.innerText = '');
     document.getElementById('form_type').value = '토지';
     document.getElementById('form_dealType').value = '매도';
     document.getElementById('form_status').value = '1.광고중';
@@ -833,6 +926,7 @@
 
     document.getElementById('form_area_supply_1').value = item.area_supply || '';
     document.getElementById('form_area_exclusive_1').value = item.area_exclusive || '';
+    document.getElementById('form_totalFloorArea_1').value = item.totalFloorArea || '';
     document.getElementById('form_premium').value = item.premium || '';
     document.getElementById('form_occupancyStatus').value = item.occupancyStatus || '';
     document.getElementById('form_currentBiz').value = item.currentBiz || '';
@@ -840,16 +934,26 @@
 
     document.getElementById('form_area_land_2').value = item.area_land || '';
     document.getElementById('form_area_supply_2').value = item.area_supply || '';
+    document.getElementById('form_totalFloorArea_2').value = item.totalFloorArea || '';
     document.getElementById('form_powerSupply').value = item.powerSupply || '';
     document.getElementById('form_ceilingHeight').value = item.ceilingHeight || '';
 
     document.getElementById('form_area_supply_3').value = item.area_supply || '';
     document.getElementById('form_area_exclusive_3').value = item.area_exclusive || '';
+    document.getElementById('form_area_land_3').value = item.area_land || '';
     document.getElementById('form_rooms').value = item.rooms || '';
     document.getElementById('form_bathrooms').value = item.bathrooms || '';
     document.getElementById('form_direction').value = item.direction || '';
     document.getElementById('form_pet').value = item.pet || '';
     document.getElementById('form_structureNote').value = item.structureNote || '';
+
+    // 면적 입력란 평 환산 미리보기 갱신
+    ['form_area_land', 'form_area_supply_1', 'form_area_exclusive_1', 'form_totalFloorArea_1',
+     'form_area_land_2', 'form_area_supply_2', 'form_totalFloorArea_2',
+     'form_area_supply_3', 'form_area_exclusive_3', 'form_area_land_3'].forEach(id => {
+      const el = document.getElementById(id);
+      updateAreaPreview(el, 'pv_' + id.replace('form_', ''));
+    });
 
     document.getElementById('form_blogLink').value = item.blogLink || '';
     document.getElementById('form_memo').value = item.memo || '';
@@ -914,6 +1018,7 @@
     } else if (type === '상가') {
       payload.area_supply = document.getElementById('form_area_supply_1').value;
       payload.area_exclusive = document.getElementById('form_area_exclusive_1').value;
+      payload.totalFloorArea = document.getElementById('form_totalFloorArea_1').value;
       payload.premium = document.getElementById('form_premium').value;
       payload.occupancyStatus = document.getElementById('form_occupancyStatus').value;
       payload.currentBiz = document.getElementById('form_currentBiz').value;
@@ -921,11 +1026,13 @@
     } else if (type === '공장창고') {
       payload.area_land = document.getElementById('form_area_land_2').value;
       payload.area_supply = document.getElementById('form_area_supply_2').value;
+      payload.totalFloorArea = document.getElementById('form_totalFloorArea_2').value;
       payload.powerSupply = document.getElementById('form_powerSupply').value;
       payload.ceilingHeight = document.getElementById('form_ceilingHeight').value;
     } else if (type === '주택') {
       payload.area_supply = document.getElementById('form_area_supply_3').value;
       payload.area_exclusive = document.getElementById('form_area_exclusive_3').value;
+      payload.area_land = document.getElementById('form_area_land_3').value;
       payload.rooms = document.getElementById('form_rooms').value;
       payload.bathrooms = document.getElementById('form_bathrooms').value;
       payload.direction = document.getElementById('form_direction').value;
