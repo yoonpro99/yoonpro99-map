@@ -31,13 +31,13 @@
   .blog-btn:hover { background:#3a6bd8; color:white; }
   .marker-label { background:white; border:1px solid #ccc; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:bold; color:#333; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
 
-  .info-modal { display:none; position: fixed; top:50%; left:50%; transform: translate(-50%,-50%); background:white; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.25); z-index:2100; width:360px; max-height:80vh; overflow-y:auto; padding:20px; }
-  .info-modal h3 { margin:0 0 4px; font-size:16px; color:#222; }
-  .info-modal .info-badges { margin-bottom:12px; }
-  .info-row { display:flex; padding:6px 0; border-bottom:1px solid #f5f5f5; font-size:13px; }
+  .item-card.selected { background:#f5f9f5; }
+  .inline-detail { background:#fafcfa; border-top:2px solid #00a844; border-bottom:1px solid #e0e0e0; padding:14px 20px; }
+  .inline-detail .info-badges { margin-bottom:8px; }
+  .info-row { display:flex; padding:6px 0; border-bottom:1px solid #f0f0f0; font-size:13px; }
   .info-row .k { width:88px; flex-shrink:0; color:#888; }
   .info-row .v { color:#222; flex:1; }
-  .info-btn-area { display:flex; gap:8px; margin-top:16px; }
+  .info-btn-area { display:flex; gap:8px; margin-top:14px; }
 
   .map-area { flex: 1; height: 100%; position: relative; display:flex; flex-direction:column; }
   #map { flex:1; width: 100%; }
@@ -161,18 +161,6 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="infoOverlay" onclick="closeInfoPopup()"></div>
-<div class="info-modal" id="infoModal">
-  <h3 id="infoTitle">매물명</h3>
-  <div class="info-badges" id="infoBadges"></div>
-  <div id="infoBody"></div>
-  <div class="info-btn-area">
-    <button class="btn btn-delete" onclick="deleteFromInfo()">삭제</button>
-    <button class="btn btn-cancel" onclick="closeInfoPopup()">닫기</button>
-    <button class="btn btn-submit" onclick="editFromInfo()">수정</button>
-  </div>
-</div>
-
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal()"></div>
 <div class="modal" id="propertyModal">
   <h3 id="modalTitle">매물 등록</h3>
@@ -186,7 +174,7 @@
   <div class="form-row">
     <div class="form-group">
       <label>매물유형</label>
-      <select id="form_type" onchange="toggleConditionalFields()">
+      <select id="form_type" onchange="refreshKindOptions(); toggleConditionalFields()">
         <option value="토지">토지</option>
         <option value="상가">상가</option>
         <option value="공장창고">공장창고</option>
@@ -250,9 +238,14 @@
 
   <div class="section-label" style="margin-top:6px;">고객 연결 (선택)</div>
   <div class="form-group">
-    <label>고객 검색 (이름 입력)</label>
+    <label>고객 검색 (이름 입력 - 목록에 없으면 신규 등록)</label>
     <input type="text" id="form_customerSearch" list="customersList" placeholder="고객명 입력" oninput="resolveCustomer()">
     <datalist id="customersList"></datalist>
+    <div class="customer-preview" id="customerPreview" style="display:none;"></div>
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <button type="button" class="btn btn-cancel" style="flex:1;" onclick="openCustomerModal('create')">+ 신규 고객 등록</button>
+      <button type="button" class="btn btn-cancel" style="flex:1;" id="btnEditCustomer" onclick="editResolvedCustomer()" disabled>선택 고객 정보수정</button>
+    </div>
   </div>
   <datalist id="occupancyList"><option value="공실"></datalist>
 
@@ -389,6 +382,29 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="customerModalOverlay" onclick="closeCustomerModal()"></div>
+<div class="modal" id="customerModal" style="width:360px;">
+  <h3 id="customerModalTitle">신규 고객 등록</h3>
+  <input type="hidden" id="cust_id">
+  <div class="form-group"><label>고객명 *</label><input type="text" id="cust_name"></div>
+  <div class="form-group"><label>연락처</label><input type="text" id="cust_phone" placeholder="예: 010-1234-5678"></div>
+  <div class="form-group">
+    <label>고객유형</label>
+    <select id="cust_type">
+      <option value=""></option>
+      <option value="매도인">매도인</option>
+      <option value="매수인">매수인</option>
+      <option value="임대인">임대인</option>
+      <option value="임차인">임차인</option>
+    </select>
+  </div>
+  <div class="form-group"><label>메모</label><textarea id="cust_memo"></textarea></div>
+  <div class="btn-area">
+    <button class="btn btn-cancel" onclick="closeCustomerModal()">취소</button>
+    <button class="btn btn-submit" onclick="saveCustomer()">저장</button>
+  </div>
+</div>
+
 <!-- appkey를 본인의 카카오 JavaScript 키로 교체하세요. libraries=services는 주소 검색(지오코딩)에 필요합니다 -->
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=3e39f7248f3829204f5bd2ef0cf24e94&libraries=services"></script>
 <script>
@@ -479,7 +495,7 @@
       } else if (f.type === 'textarea') {
         inputHtml = '<textarea id="' + id + '"></textarea>';
       } else if (f.type === 'date') {
-        inputHtml = '<input type="date" id="' + id + '">';
+        inputHtml = '<input type="date" id="' + id + '" min="1900-01-01" max="2100-12-31" oninput="clampDateInput(this)" onchange="clampDateInput(this)">';
       } else if (f.type === 'number') {
         inputHtml = '<input type="number" id="' + id + '"' +
           (f.areaPreview ? ' oninput="updateAreaPreview(this,\'pv_' + (f.domId || f.key) + '\')"' : '') + '>';
@@ -517,7 +533,7 @@
   }
   function toPyeongStr(sqm) {
     const p = toPyeongNum(sqm);
-    return (p === null) ? '' : p.toFixed(1) + '평';
+    return (p === null) ? '' : fmtNum(p.toFixed(1)) + '평';
   }
 
   // 매물유형/매물종류에 따라 검색 시 사용할 면적 필드 자동 판별
@@ -535,6 +551,22 @@
   function updateAreaPreview(inputEl, previewId) {
     const p = toPyeongNum(inputEl.value);
     document.getElementById(previewId).innerText = (p !== null) ? '≈ ' + p.toFixed(1) + '평' : '';
+  }
+
+  // 숫자를 1,000 단위 콤마 표기로 변환 (표시 전용 - 입력값/전송값은 원본 그대로 유지)
+  function fmtNum(v) {
+    const n = parseNum(v);
+    return (n === null) ? '' : n.toLocaleString('ko-KR');
+  }
+
+  // 날짜 입력(type=date)에서 연도가 4자리를 넘어가지 않도록 강제 (일부 브라우저/모바일에서 6자리까지 입력되는 문제 방지)
+  function clampDateInput(el) {
+    if (!el.value) return;
+    const parts = el.value.split('-');
+    if (parts[0] && parts[0].length > 4) {
+      parts[0] = parts[0].slice(0, 4);
+      el.value = parts.join('-');
+    }
   }
 
   document.getElementById('locationsList').innerHTML = LOCATIONS.map(l => '<option value="' + l + '">').join('');
@@ -576,15 +608,90 @@
       .catch(err => alert("데이터 로딩 실패: " + err));
   }
 
+  // 고객 검색창에 보여줄 문구: 이름 + 연락처만 사용하고 고객ID는 노출하지 않음
+  function customerDisplay(c) {
+    return c.phone ? (c.name + ' - ' + c.phone) : c.name;
+  }
+
   function populateCustomerList(customers) {
     document.getElementById('customersList').innerHTML =
-      customers.map(c => '<option value="' + c.name + ' (' + c.id + ')">').join('');
+      customers.map(c => '<option value="' + customerDisplay(c) + '">').join('');
   }
 
   function resolveCustomer() {
-    const val = document.getElementById('form_customerSearch').value;
-    const match = val.match(/\(([^)]+)\)\s*$/);
-    document.getElementById('form_customerId').value = match ? match[1] : '';
+    const val = document.getElementById('form_customerSearch').value.trim();
+    const match = currentCustomers.find(c => customerDisplay(c) === val);
+    const idEl = document.getElementById('form_customerId');
+    const preview = document.getElementById('customerPreview');
+    const editBtn = document.getElementById('btnEditCustomer');
+    if (match) {
+      idEl.value = match.id;
+      preview.style.display = 'block';
+      preview.innerText = '연결됨: ' + match.name + (match.phone ? ' · ' + match.phone : '') + (match.custType ? ' · ' + match.custType : '');
+      editBtn.disabled = false;
+    } else {
+      idEl.value = '';
+      preview.style.display = 'none';
+      editBtn.disabled = true;
+    }
+  }
+
+  function editResolvedCustomer() {
+    const id = document.getElementById('form_customerId').value;
+    const c = currentCustomers.find(x => String(x.id) === String(id));
+    if (c) openCustomerModal('edit', c);
+  }
+
+  function openCustomerModal(mode, customer) {
+    document.getElementById('customerModalTitle').innerText = (mode === 'edit') ? '고객 정보 수정' : '신규 고객 등록';
+    document.getElementById('cust_id').value = (mode === 'edit' && customer) ? customer.id : '';
+    document.getElementById('cust_name').value = (mode === 'edit' && customer) ? (customer.name || '') : '';
+    document.getElementById('cust_phone').value = (mode === 'edit' && customer) ? (customer.phone || '') : '';
+    document.getElementById('cust_type').value = (mode === 'edit' && customer) ? (customer.custType || '') : '';
+    document.getElementById('cust_memo').value = (mode === 'edit' && customer) ? (customer.memo || '') : '';
+    document.getElementById('customerModal').style.display = 'block';
+    document.getElementById('customerModalOverlay').style.display = 'block';
+  }
+
+  function closeCustomerModal() {
+    document.getElementById('customerModal').style.display = 'none';
+    document.getElementById('customerModalOverlay').style.display = 'none';
+  }
+
+  function saveCustomer() {
+    const name = document.getElementById('cust_name').value.trim();
+    if (!name) { alert('고객명을 입력해주세요.'); return; }
+    const id = document.getElementById('cust_id').value;
+    const payload = {
+      token: API_TOKEN,
+      action: id ? 'customerUpdate' : 'customerCreate',
+      id: id,
+      name: name,
+      phone: document.getElementById('cust_phone').value,
+      custType: document.getElementById('cust_type').value,
+      memo: document.getElementById('cust_memo').value
+    };
+
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(res => {
+        alert(res.message);
+        if (!res.success) return;
+        closeCustomerModal();
+        // 고객 목록만 다시 불러옵니다 (매물 데이터는 그대로 두어 불필요한 재조회를 피합니다)
+        fetch(fetchUrl(GAS_URL)).then(r => r.json()).then(data => {
+          currentCustomers = data.customers || [];
+          populateCustomerList(currentCustomers);
+          const targetId = res.id || id;
+          const c = currentCustomers.find(x => String(x.id) === String(targetId));
+          if (c) {
+            document.getElementById('form_customerSearch').value = customerDisplay(c);
+            document.getElementById('form_customerId').value = c.id;
+            resolveCustomer();
+          }
+        });
+      })
+      .catch(err => alert('저장 실패: ' + err));
   }
 
   function composeAddress() {
@@ -598,21 +705,24 @@
   }
 
   function geocodeFormAddress() {
-    const address = composeAddress();
+    const fullAddress = composeAddress(); // 지번 포함 주소 - 좌표(위경도) 검색용으로만 사용
+    const loc = document.getElementById('form_location').value.trim();
     const statusEl = document.getElementById('geocodeStatus');
-    if (!address) { alert('읍/면/리와 본번을 입력해주세요.'); return; }
+    if (!fullAddress) { alert('읍/면/리와 본번을 입력해주세요.'); return; }
 
-    geocoder.addressSearch(address, function (result, status) {
+    geocoder.addressSearch(fullAddress, function (result, status) {
       if (status !== kakao.maps.services.Status.OK) {
         statusEl.style.color = '#ff4d4f';
-        statusEl.innerText = '✗ 주소를 찾을 수 없습니다: ' + address;
+        statusEl.innerText = '✗ 주소를 찾을 수 없습니다: ' + fullAddress;
         return;
       }
       document.getElementById('form_lat').value = result[0].y;
       document.getElementById('form_lng').value = result[0].x;
-      document.getElementById('form_address').value = address;
+      // 소재지(I열)는 Locations 시트를 참조하는 읍/면/리 값만 저장합니다.
+      // Full지번(M열)은 소재지+산+본번+부번을 조합하는 시트 수식이 자동으로 만들어주므로 여기서 값을 넣지 않습니다.
+      document.getElementById('form_address').value = loc;
       statusEl.style.color = '#00a844';
-      statusEl.innerText = '✓ 좌표 확인됨: ' + address;
+      statusEl.innerText = '✓ 좌표 확인됨: ' + fullAddress;
     });
   }
 
@@ -748,7 +858,7 @@
       const marker = new kakao.maps.Marker({ position: pos, map: map, image: markerImageForType(item.type) });
       markers.push(marker);
       bounds.extend(pos);
-      kakao.maps.event.addListener(marker, 'click', () => openInfoPopup(item));
+      kakao.maps.event.addListener(marker, 'click', () => selectItem(item));
     });
 
     if (fitBounds) map.setBounds(bounds);
@@ -756,10 +866,10 @@
 
   function formatPrice(item) {
     const group = priceGroup(item.dealType);
-    if (group === 'sale') return (item.dealType || '') + ' ' + (item.price_sale || '-');
-    if (group === 'jeonse') return (item.dealType || '') + ' ' + (item.deposit || 0);
-    if (group === 'yearly') return (item.dealType || '') + ' ' + (item.deposit || 0) + '/' + (item.yearly || 0);
-    return (item.dealType || '') + ' ' + (item.deposit || 0) + '/' + (item.monthly || 0);
+    if (group === 'sale') return (item.dealType || '') + ' ' + (item.price_sale ? fmtNum(item.price_sale) : '-');
+    if (group === 'jeonse') return (item.dealType || '') + ' ' + fmtNum(item.deposit || 0);
+    if (group === 'yearly') return (item.dealType || '') + ' ' + fmtNum(item.deposit || 0) + '/' + fmtNum(item.yearly || 0);
+    return (item.dealType || '') + ' ' + fmtNum(item.deposit || 0) + '/' + fmtNum(item.monthly || 0);
   }
 
   function typeSummary(item) {
@@ -778,6 +888,7 @@
     data.forEach(item => {
       const card = document.createElement('div');
       card.className = 'item-card';
+      card.dataset.id = item.id;
       card.innerHTML = `
         <div class="badges">
           <span class="badge badge-status">${item.status || ''}</span>
@@ -791,12 +902,62 @@
         ${item.customerName ? `<div class="customer">고객: ${item.customerName}</div>` : ''}
         ${item.blogLink ? `<a class="blog-btn" href="${item.blogLink}" target="_blank" onclick="event.stopPropagation()">블로그</a>` : ''}
       `;
-      card.onclick = () => {
-        map.panTo(new kakao.maps.LatLng(item.lat, item.lng));
-        openInfoPopup(item);
-      };
+      card.onclick = () => selectItem(item);
       listDiv.appendChild(card);
     });
+  }
+
+  // ===== 매물 상세보기: 지도 위 팝업 대신, 목록에서 선택한 카드 바로 아래에 펼쳐서 보여줍니다 =====
+  // (지도는 위치 확인용으로 마커로 이동만 시키고, 상세 정보/수정/삭제는 항상 목록쪽에서 처리 - 구조가 단순해서 에러 지점이 적습니다)
+  function selectItem(item) {
+    map.panTo(new kakao.maps.LatLng(item.lat, item.lng));
+    const card = document.querySelector('.item-card[data-id="' + item.id + '"]');
+    toggleInlineDetail(item, card);
+  }
+
+  function toggleInlineDetail(item, card) {
+    const existing = document.getElementById('inlineDetail');
+    const wasOpenForThis = existing && existing.dataset.forId === String(item.id);
+    if (existing) existing.remove();
+    document.querySelectorAll('.item-card.selected').forEach(el => el.classList.remove('selected'));
+    if (wasOpenForThis) return; // 같은 항목을 다시 클릭하면 닫기만 하고 종료
+
+    const detail = document.createElement('div');
+    detail.id = 'inlineDetail';
+    detail.className = 'inline-detail';
+    detail.dataset.forId = item.id;
+    detail.innerHTML =
+      '<div class="info-badges">' +
+        '<span class="badge badge-status">' + (item.status || '') + '</span>' +
+        (item.customerName ? '<span class="badge badge-type">고객: ' + item.customerName + '</span>' : '') +
+      '</div>' +
+      buildInfoFields(item) +
+      '<div class="info-btn-area">' +
+        '<button class="btn btn-delete" onclick="event.stopPropagation(); deleteItem(\'' + item.id + '\')">삭제</button>' +
+        '<button class="btn btn-submit" onclick="event.stopPropagation(); openEditModal(currentData.find(function(d){return String(d.id)===\'' + item.id + '\';}))">수정</button>' +
+      '</div>';
+
+    if (card) {
+      card.classList.add('selected');
+      card.insertAdjacentElement('afterend', detail);
+      detail.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+      // 지도 마커 클릭 등으로 목록에 카드가 아직 안 보이는 경우를 대비한 안전장치
+      document.getElementById('itemList').prepend(detail);
+    }
+  }
+
+  function deleteItem(id) {
+    if (!confirm('정말 이 매물을 삭제하시겠습니까? (되돌릴 수 없습니다)')) return;
+    const payload = { token: API_TOKEN, action: 'delete', id: id };
+
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+      .then(res => res.json())
+      .then(res => {
+        alert(res.message);
+        if (res.success) loadData();
+      })
+      .catch(err => alert('삭제 실패: ' + err));
   }
 
   // ===== 신규 등록 흐름: 버튼 -> 폼 바로 열기 =====
@@ -830,8 +991,7 @@
     openRegisterModal();
   }
 
-  // ===== 조회 팝업 (마커/목록 클릭 시 - 유형별 핵심 정보만 가볍게 표시) =====
-  let currentInfoItem = null;
+  // ===== 매물 상세 정보 렌더링 (목록 인라인 상세 + 수정폼 프리필에 공용으로 사용) =====
 
   function row(label, value, always) {
     if (!always && (value === undefined || value === null || value === '')) return '';
@@ -842,16 +1002,16 @@
     const group = priceGroup(item.dealType);
     let html = '';
     if (group === 'sale') {
-      html += row('매매가', item.price_sale, true);
-      html += row('평단가', item.price_per_pyeong);
+      html += row('매매가', fmtNum(item.price_sale), true);
+      html += row('평단가', fmtNum(item.price_per_pyeong));
     } else if (group === 'jeonse') {
-      html += row('보증금', item.deposit, true);
+      html += row('보증금', fmtNum(item.deposit), true);
     } else if (group === 'yearly') {
-      html += row('보증금', item.deposit, true);
-      html += row('연세', item.yearly, true);
+      html += row('보증금', fmtNum(item.deposit), true);
+      html += row('연세', fmtNum(item.yearly), true);
     } else {
-      html += row('보증금', item.deposit, true);
-      html += row('월세', item.monthly, true);
+      html += row('보증금', fmtNum(item.deposit), true);
+      html += row('월세', fmtNum(item.monthly), true);
     }
     if (item.type === '상가' || item.type === '공장창고') {
       html += row('부가세', 'VAT별도', true);
@@ -861,7 +1021,7 @@
 
   function maintenanceText(item) {
     if (!item.maintenanceFee) return '';
-    return item.maintenanceFee + (item.maintenanceFeeItems ? ' (' + item.maintenanceFeeItems + ')' : '');
+    return fmtNum(item.maintenanceFee) + (item.maintenanceFeeItems ? ' (' + item.maintenanceFeeItems + ')' : '');
   }
 
   function buildInfoFields(item) {
@@ -869,14 +1029,14 @@
     let html = common + priceRows(item);
 
     if (item.type === '토지') {
-      html += row('권리금', item.premium);
+      html += row('권리금', fmtNum(item.premium));
       html += row('매물유형상세', item.kind);
       html += row('용도지역', item.landZone);
       html += row('지구.구역', item.districtZone);
       html += row('대지', toPyeongStr(item.area_land));
       html += row('메모', item.memo);
     } else if (item.type === '상가') {
-      html += row('권리금', item.premium);
+      html += row('권리금', fmtNum(item.premium));
       html += row('매물유형상세', item.kind);
       html += row('건축물용도', item.buildingUse);
       html += row('연면적', toPyeongStr(item.totalFloorArea));
@@ -911,7 +1071,7 @@
       html += row('반려동물', item.pet);
       html += row('메모', item.memo);
     } else if (item.type === '공장창고') {
-      html += row('권리금', item.premium);
+      html += row('권리금', fmtNum(item.premium));
       html += row('매물유형상세', item.kind);
       html += row('건축물용도', item.buildingUse);
       html += row('연면적', toPyeongStr(item.totalFloorArea));
@@ -924,46 +1084,10 @@
       html += row('층고', item.ceilingHeight);
       html += row('메모', item.memo);
     }
-    html += row('등록일', item.registeredDate ? item.registeredDate.toString().slice(0,10) : '');
-    html += row('확인일', item.updatedDate ? item.updatedDate.toString().slice(0,10) : '');
-    html += row('현재경과일', item.elapsedDays ? item.elapsedDays + '일' : '');
+    html += row('등록일', item.registeredDate);
+    html += row('확인일', item.updatedDate);
+    html += row('현재경과일', item.elapsedDays !== '' && item.elapsedDays !== undefined ? item.elapsedDays + '일' : '');
     return html;
-  }
-
-  function openInfoPopup(item) {
-    currentInfoItem = item;
-    document.getElementById('infoTitle').innerText = item.name || '(매물명 생성중)';
-    document.getElementById('infoBadges').innerHTML =
-      '<span class="badge badge-status">' + (item.status || '') + '</span>' +
-      (item.customerName ? '<span class="badge badge-type">고객: ' + item.customerName + '</span>' : '');
-    document.getElementById('infoBody').innerHTML = buildInfoFields(item);
-    document.getElementById('infoModal').style.display = 'block';
-    document.getElementById('infoOverlay').style.display = 'block';
-  }
-
-  function closeInfoPopup() {
-    document.getElementById('infoModal').style.display = 'none';
-    document.getElementById('infoOverlay').style.display = 'none';
-  }
-
-  function editFromInfo() {
-    const item = currentInfoItem;
-    closeInfoPopup();
-    if (item) openEditModal(item);
-  }
-
-  function deleteFromInfo() {
-    if (!currentInfoItem) return;
-    if (!confirm('정말 이 매물을 삭제하시겠습니까? (되돌릴 수 없습니다)')) return;
-    const payload = { token: API_TOKEN, action: 'delete', id: currentInfoItem.id };
-
-    fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
-      .then(res => res.json())
-      .then(res => {
-        alert(res.message);
-        if (res.success) { closeInfoPopup(); loadData(); }
-      })
-      .catch(err => alert('삭제 실패: ' + err));
   }
 
   function toggleConditionalFields() {
@@ -997,6 +1121,8 @@
     document.getElementById('form_dealType').value = '매도';
     document.getElementById('form_status').value = '1.광고중';
     document.getElementById('geocodeStatus').innerText = '';
+    document.getElementById('customerPreview').style.display = 'none';
+    document.getElementById('btnEditCustomer').disabled = true;
     refreshKindOptions();
     toggleConditionalFields();
     togglePriceFields();
@@ -1033,7 +1159,18 @@
     document.getElementById('geocodeStatus').style.color = '#00a844';
 
     document.getElementById('form_customerId').value = item.customerId || '';
-    document.getElementById('form_customerSearch').value = item.customerName ? (item.customerName + ' (' + item.customerId + ')') : '';
+    {
+      const c = currentCustomers.find(x => String(x.id) === String(item.customerId));
+      if (c) {
+        document.getElementById('form_customerSearch').value = customerDisplay(c);
+        resolveCustomer(); // 정상 매칭되면 미리보기/수정버튼 상태 갱신
+      } else {
+        // 고객 목록에서 아직 못 찾았어도(로딩 지연 등) 기존 고객ID는 그대로 유지합니다.
+        document.getElementById('form_customerSearch').value = item.customerName || '';
+        document.getElementById('customerPreview').style.display = 'none';
+        document.getElementById('btnEditCustomer').disabled = true;
+      }
+    }
 
     document.getElementById('form_price_sale').value = item.price_sale || '';
     document.getElementById('form_price_per_pyeong').value = item.price_per_pyeong || ''; // 자동계산값 표시만 (읽기전용)
