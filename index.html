@@ -383,19 +383,72 @@
 </div>
 
 <div class="modal-overlay" id="customerModalOverlay" onclick="closeCustomerModal()"></div>
-<div class="modal" id="customerModal" style="width:360px;">
+<div class="modal" id="customerModal" style="width:380px;">
   <h3 id="customerModalTitle">신규 고객 등록</h3>
   <input type="hidden" id="cust_id">
-  <div class="form-group"><label>고객명 *</label><input type="text" id="cust_name"></div>
-  <div class="form-group"><label>연락처</label><input type="text" id="cust_phone" placeholder="예: 010-1234-5678"></div>
+  <div class="form-row">
+    <div class="form-group"><label>고객명 *</label><input type="text" id="cust_name"></div>
+    <div class="form-group">
+      <label>고객유형</label>
+      <select id="cust_custType">
+        <option value=""></option>
+        <option value="일반">일반</option>
+        <option value="중개사">중개사</option>
+        <option value="분양사">분양사</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>연락처</label><input type="text" id="cust_phone" placeholder="예: 010-1234-5678"></div>
+    <div class="form-group"><label>추가연락처</label><input type="text" id="cust_altPhone"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>통신사</label><input type="text" id="cust_telco" list="telcoList" placeholder="예: SKT"></div>
+    <div class="form-group">
+      <label>관계</label>
+      <select id="cust_relation">
+        <option value=""></option>
+        <option value="배우자">배우자</option>
+        <option value="가족">가족</option>
+        <option value="지인">지인</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+  </div>
+  <datalist id="telcoList"><option value="SKT"><option value="KT"><option value="LG U+"><option value="알뜰폰"></datalist>
+  <div class="form-group"><label>광고용이름</label><input type="text" id="cust_adName" placeholder="블로그/광고에 노출할 이름(선택)"></div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>유입경로</label>
+      <select id="cust_channel">
+        <option value=""></option>
+        <option value="전화">전화</option>
+        <option value="문자">문자</option>
+        <option value="카톡">카톡</option>
+        <option value="블로그">블로그</option>
+        <option value="당근">당근</option>
+        <option value="쓰레드">쓰레드</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>고객상태</label>
+      <select id="cust_status">
+        <option value=""></option>
+        <option value="활성">활성</option>
+        <option value="비활성">비활성</option>
+      </select>
+    </div>
+  </div>
   <div class="form-group">
-    <label>고객유형</label>
-    <select id="cust_type">
+    <label>계약상태</label>
+    <select id="cust_dealStatus">
       <option value=""></option>
-      <option value="매도인">매도인</option>
-      <option value="매수인">매수인</option>
-      <option value="임대인">임대인</option>
-      <option value="임차인">임차인</option>
+      <option value="신규">신규</option>
+      <option value="상담중">상담중</option>
+      <option value="계약완료">계약완료</option>
+      <option value="보류">보류</option>
+      <option value="취소">취소</option>
     </select>
   </div>
   <div class="form-group"><label>메모</label><textarea id="cust_memo"></textarea></div>
@@ -644,11 +697,19 @@
 
   function openCustomerModal(mode, customer) {
     document.getElementById('customerModalTitle').innerText = (mode === 'edit') ? '고객 정보 수정' : '신규 고객 등록';
-    document.getElementById('cust_id').value = (mode === 'edit' && customer) ? customer.id : '';
-    document.getElementById('cust_name').value = (mode === 'edit' && customer) ? (customer.name || '') : '';
-    document.getElementById('cust_phone').value = (mode === 'edit' && customer) ? (customer.phone || '') : '';
-    document.getElementById('cust_type').value = (mode === 'edit' && customer) ? (customer.custType || '') : '';
-    document.getElementById('cust_memo').value = (mode === 'edit' && customer) ? (customer.memo || '') : '';
+    const c = (mode === 'edit' && customer) ? customer : {};
+    document.getElementById('cust_id').value = c.id || '';
+    document.getElementById('cust_name').value = c.name || '';
+    document.getElementById('cust_custType').value = c.custType || '';
+    document.getElementById('cust_phone').value = c.phone || '';
+    document.getElementById('cust_altPhone').value = c.altPhone || '';
+    document.getElementById('cust_telco').value = c.telco || '';
+    document.getElementById('cust_relation').value = c.relation || '';
+    document.getElementById('cust_adName').value = c.adName || '';
+    document.getElementById('cust_channel').value = c.channel || '';
+    document.getElementById('cust_status').value = c.custStatus || '';
+    document.getElementById('cust_dealStatus').value = c.dealStatus || '';
+    document.getElementById('cust_memo').value = c.memo || '';
     document.getElementById('customerModal').style.display = 'block';
     document.getElementById('customerModalOverlay').style.display = 'block';
   }
@@ -667,8 +728,15 @@
       action: id ? 'customerUpdate' : 'customerCreate',
       id: id,
       name: name,
+      custType: document.getElementById('cust_custType').value,
       phone: document.getElementById('cust_phone').value,
-      custType: document.getElementById('cust_type').value,
+      altPhone: document.getElementById('cust_altPhone').value,
+      telco: document.getElementById('cust_telco').value,
+      relation: document.getElementById('cust_relation').value,
+      adName: document.getElementById('cust_adName').value,
+      channel: document.getElementById('cust_channel').value,
+      custStatus: document.getElementById('cust_status').value,
+      dealStatus: document.getElementById('cust_dealStatus').value,
       memo: document.getElementById('cust_memo').value
     };
 
@@ -1084,9 +1152,7 @@
       html += row('층고', item.ceilingHeight);
       html += row('메모', item.memo);
     }
-    html += row('등록일', item.registeredDate);
-    html += row('확인일', item.updatedDate);
-    html += row('현재경과일', item.elapsedDays !== '' && item.elapsedDays !== undefined ? item.elapsedDays + '일' : '');
+    // 등록일/확인일/현재경과일은 목록에서 숨깁니다 (정렬 등 내부 로직에서는 계속 사용됩니다)
     return html;
   }
 
