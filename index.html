@@ -164,7 +164,7 @@
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal()"></div>
 <div class="modal" id="propertyModal">
   <h3 id="modalTitle">매물 등록</h3>
-  <div class="name-preview">매물명은 시트 수식으로 자동 생성됩니다. 여기서는 입력하지 않습니다.</div>
+  <div class="name-preview">매물명은 저장 시 서버에서 자동 생성되어 시트 C열에도 기록됩니다. 여기서는 입력하지 않습니다.</div>
 
   <input type="hidden" id="form_id">
   <input type="hidden" id="form_lat">
@@ -921,26 +921,37 @@
     markers = [];
 
     const filtered = getFilteredData();
-    filtered.sort((a, b) => {
-      const aTime = Math.max(new Date(a.updatedDate || 0).getTime() || 0, new Date(a.registeredDate || 0).getTime() || 0);
-      const bTime = Math.max(new Date(b.updatedDate || 0).getTime() || 0, new Date(b.registeredDate || 0).getTime() || 0);
-      return bTime - aTime; // 최근 것이 먼저
-    });
-    renderList(filtered);
-    document.getElementById('listCount').innerText = filtered.length + '건 (전체 ' + currentData.length + '건)';
 
-    if (filtered.length === 0) return;
-    const bounds = new kakao.maps.LatLngBounds();
+    const itemTime = (item) => Math.max(
+      new Date(item.updatedDate || 0).getTime() || 0,
+      new Date(item.registeredDate || 0).getTime() || 0
+    );
 
-    // 좌표가 같은(=같은 주소) 매물끼리 묶어서 마커 1개만 찍고, 개수는 뱃지로 표시합니다.
-    const groups = {};
+    // 좌표(=주소)가 같은 매물끼리 먼저 그룹으로 묶습니다.
+    // -> 마커는 그룹당 1개만 찍고 개수 뱃지로 표시하고,
+    //    목록도 같은 그룹끼리는 항상 붙어서(연속으로) 나오도록 합니다.
+    const groupMap = {};
     filtered.forEach(item => {
       const key = Number(item.lat).toFixed(6) + ',' + Number(item.lng).toFixed(6);
-      (groups[key] = groups[key] || []).push(item);
+      (groupMap[key] = groupMap[key] || []).push(item);
     });
 
-    Object.keys(groups).forEach(key => {
-      const group = groups[key];
+    const groups = Object.values(groupMap).map(group => {
+      group.sort((a, b) => itemTime(b) - itemTime(a)); // 그룹 내부: 최신순
+      return { items: group, latestTime: Math.max(...group.map(itemTime)) };
+    });
+    groups.sort((a, b) => b.latestTime - a.latestTime); // 그룹끼리: 최신순 (기존 정렬 느낌 유지)
+
+    const sortedFiltered = groups.flatMap(g => g.items);
+
+    renderList(sortedFiltered);
+    document.getElementById('listCount').innerText = sortedFiltered.length + '건 (전체 ' + currentData.length + '건)';
+
+    if (sortedFiltered.length === 0) return;
+    const bounds = new kakao.maps.LatLngBounds();
+
+    groups.forEach(g => {
+      const group = g.items;
       const first = group[0];
       const pos = new kakao.maps.LatLng(first.lat, first.lng);
       const marker = new kakao.maps.Marker({ position: pos, map: map, image: markerImageForType(first.type, group.length) });
