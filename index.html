@@ -703,7 +703,8 @@
     return base + (base.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(API_TOKEN);
   }
 
-  function loadData() {
+  function loadData(fitBounds) {
+    if (fitBounds === undefined) fitBounds = true;
     fetch(fetchUrl(GAS_URL))
       .then(res => res.json())
       .then(data => {
@@ -711,7 +712,7 @@
         currentData = data.properties || [];
         currentCustomers = data.customers || [];
         populateCustomerList(currentCustomers);
-        applyFilters(true); // 최초 로드 시에는 지도 범위도 자동으로 맞춤
+        applyFilters(fitBounds); // 최초 로드 시에는 지도 범위도 자동으로 맞춤
       })
       .catch(err => alert("데이터 로딩 실패: " + err));
   }
@@ -1487,7 +1488,12 @@
         alert(res.message);
         if (res.success) {
           closeModal();
-          loadData();
+          loadData(false); // 목록/지도 데이터는 새로고침하되, 지도 범위는 전체로 되돌리지 않음
+          if (payload.lat && payload.lng) {
+            const pos = new kakao.maps.LatLng(payload.lat, payload.lng);
+            if (map.getLevel() > 3) map.setLevel(3); // 너무 축소된 상태였다면 확대해서 위치를 잘 보이게 함
+            map.panTo(pos); // 방금 수정한 매물 위치를 계속 보여줌
+          }
         }
       })
       .catch(err => alert("전송 실패: " + err));
