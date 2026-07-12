@@ -549,7 +549,8 @@
     주택: [
       { key: 'buildingName', domId: 'buildingName_3', label: '건물명', type: 'text' },
       { key: 'totalFloorArea', domId: 'totalFloorArea_3', label: '연면적(㎡)', type: 'number', areaPreview: true },
-      { key: 'buildingUnit', domId: 'buildingUnit_3', label: '해당동', type: 'text' },
+      { key: 'buildingUnit', domId: 'buildingUnit_3', label: '해당동', type: 'text', placeholder: '예: 101동' },
+      { key: 'unitNumber', domId: 'unitNumber_3', label: '호수', type: 'text', placeholder: '예: 102호' },
       { key: 'floorInfo', domId: 'floorInfo_3', label: '해당층/총층', type: 'text' },
       { key: 'approvalDate', domId: 'approvalDate_3', label: '사용승인일', type: 'date' },
       { key: 'households', domId: 'households_3', label: '세대수', type: 'number' },
@@ -1226,6 +1227,7 @@
       html += row('용도지역', item.landZone);
       html += row('지구.구역', item.districtZone);
       html += row('해당동', item.buildingUnit);
+      html += row('호수', item.unitNumber);
       html += row('해당층/총층', item.floorInfo);
       html += row('사용승인일', item.approvalDate);
       html += row('세대수', item.households);
