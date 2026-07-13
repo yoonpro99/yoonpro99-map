@@ -12,10 +12,12 @@
   .sidebar-header { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
   .sidebar-header h2 { margin: 0 0 10px 0; font-size: 17px; color: #333; }
   .sidebar-header .count { font-size: 12px; color: #888; margin-top:8px; }
-  .btn-new { width:100%; padding:10px; background:#00a844; color:white; border:none; border-radius:6px; font-weight:bold; font-size:13px; cursor:pointer; }
+  .btn-new { padding:10px 6px; background:#00a844; color:white; border:none; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; white-space:nowrap; }
   .btn-new:hover { background:#009440; }
-  .sidebar-header-row2 { display:flex; gap:6px; margin-top:6px; }
-  .btn-secondary { flex:1; padding:8px; background:#f0f0f0; color:#333; border:none; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; }
+  .sidebar-header-row1 { display:flex; flex-wrap:wrap; gap:6px; }
+  .sidebar-header-row1 .btn-new,
+  .sidebar-header-row1 .btn-secondary { flex:1 1 30%; min-width:88px; }
+  .btn-secondary { padding:9px 6px; background:#f0f0f0; color:#333; border:none; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; white-space:nowrap; }
   .btn-secondary:hover { background:#e4e4e4; }
   .list-container { flex: 1; overflow-y: auto; }
   .item-card { padding: 14px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
@@ -121,10 +123,10 @@
   <div class="sidebar">
     <div class="sidebar-header">
       <h2>매물 목록</h2>
-      <button class="btn-new" style="width:100%;" onclick="startRegister()">+ 신규 매물 등록</button>
-      <div class="sidebar-header-row2">
-        <button class="btn-secondary" onclick="openCustomerModal('create')">+ 고객 등록</button>
-        <button class="btn-secondary" onclick="openCustomerListModal()">고객 목록</button>
+      <div class="sidebar-header-row1">
+        <button class="btn-new" onclick="startRegister()">+ 매물등록</button>
+        <button class="btn-secondary" onclick="openCustomerModal('create')">+ 고객등록</button>
+        <button class="btn-secondary" onclick="openCustomerListModal()">고객목록</button>
       </div>
       <div class="count" id="listCount">불러오는 중...</div>
     </div>
@@ -148,15 +150,10 @@
         <select id="filterDealType" onchange="applyFilters()">
           <option value="">거래: 전체</option>
           <option value="매도">매도</option>
-          <option value="매수">매수</option>
           <option value="임대 전세">임대 전세</option>
           <option value="임대 연세">임대 연세</option>
           <option value="임대 월세">임대 월세</option>
           <option value="임대 단기">임대 단기</option>
-          <option value="임차 전세">임차 전세</option>
-          <option value="임차 연세">임차 연세</option>
-          <option value="임차 월세">임차 월세</option>
-          <option value="임차 단기">임차 단기</option>
         </select>
         <select id="filterStatus" onchange="applyFilters()">
           <option value="">상태: 전체</option>
@@ -234,15 +231,10 @@
       <label>거래유형</label>
       <select id="form_dealType" onchange="togglePriceFields()">
         <option value="매도">매도</option>
-        <option value="매수">매수</option>
         <option value="임대 전세">임대 전세</option>
         <option value="임대 연세">임대 연세</option>
         <option value="임대 월세">임대 월세</option>
         <option value="임대 단기">임대 단기</option>
-        <option value="임차 전세">임차 전세</option>
-        <option value="임차 연세">임차 연세</option>
-        <option value="임차 월세">임차 월세</option>
-        <option value="임차 단기">임차 단기</option>
       </select>
     </div>
     <div class="form-group">
@@ -460,6 +452,26 @@
   </div>
   <datalist id="telcoList"><option value="SKT"><option value="KT"><option value="LG U+"><option value="알뜰폰"></datalist>
   <div class="form-group"><label>광고용이름</label><input type="text" id="cust_adName" placeholder="블로그/광고에 노출할 이름(선택)"></div>
+  <div class="form-group">
+    <label>거래유형</label>
+    <select id="cust_dealType">
+      <option value=""></option>
+      <optgroup label="공급 (매물주)">
+        <option value="매도">매도</option>
+        <option value="임대 전세">임대 전세</option>
+        <option value="임대 연세">임대 연세</option>
+        <option value="임대 월세">임대 월세</option>
+        <option value="임대 단기">임대 단기</option>
+      </optgroup>
+      <optgroup label="수요 (구하는 손님)">
+        <option value="매수">매수</option>
+        <option value="임차 전세">임차 전세</option>
+        <option value="임차 연세">임차 연세</option>
+        <option value="임차 월세">임차 월세</option>
+        <option value="임차 단기">임차 단기</option>
+      </optgroup>
+    </select>
+  </div>
   <div class="form-row">
     <div class="form-group">
       <label>유입경로</label>
@@ -506,6 +518,23 @@
   <h3>고객 목록</h3>
   <div class="search-row-main" style="margin-bottom:10px;">
     <input type="text" id="custListSearch" placeholder="이름/연락처 검색" oninput="renderCustomerList()">
+    <select id="custListDealType" onchange="renderCustomerList()">
+      <option value="">거래유형: 전체</option>
+      <optgroup label="공급 (매물주)">
+        <option value="매도">매도</option>
+        <option value="임대 전세">임대 전세</option>
+        <option value="임대 연세">임대 연세</option>
+        <option value="임대 월세">임대 월세</option>
+        <option value="임대 단기">임대 단기</option>
+      </optgroup>
+      <optgroup label="수요 (구하는 손님)">
+        <option value="매수">매수</option>
+        <option value="임차 전세">임차 전세</option>
+        <option value="임차 연세">임차 연세</option>
+        <option value="임차 월세">임차 월세</option>
+        <option value="임차 단기">임차 단기</option>
+      </optgroup>
+    </select>
     <select id="custListStatus" onchange="renderCustomerList()">
       <option value="">고객상태: 전체</option>
       <option value="활성">활성</option>
@@ -802,6 +831,7 @@
     document.getElementById('cust_telco').value = c.telco || '';
     document.getElementById('cust_relation').value = c.relation || '';
     document.getElementById('cust_adName').value = c.adName || '';
+    document.getElementById('cust_dealType').value = c.dealType || '';
     document.getElementById('cust_channel').value = c.channel || '';
     document.getElementById('cust_status').value = c.custStatus || '';
     document.getElementById('cust_dealStatus').value = c.dealStatus || '';
@@ -818,6 +848,7 @@
   // ===== 고객 목록 화면 =====
   function openCustomerListModal() {
     document.getElementById('custListSearch').value = '';
+    document.getElementById('custListDealType').value = '';
     document.getElementById('custListStatus').value = '';
     document.getElementById('custListDealStatus').value = '';
     renderCustomerList();
@@ -832,12 +863,14 @@
 
   function renderCustomerList() {
     const q = document.getElementById('custListSearch').value.trim().toLowerCase();
+    const dealF = document.getElementById('custListDealType').value;
     const statusF = document.getElementById('custListStatus').value;
-    const dealF = document.getElementById('custListDealStatus').value;
+    const dealStatusF = document.getElementById('custListDealStatus').value;
 
     const filtered = (currentCustomers || []).filter(c => {
+      if (dealF && c.dealType !== dealF) return false;
       if (statusF && c.custStatus !== statusF) return false;
-      if (dealF && c.dealStatus !== dealF) return false;
+      if (dealStatusF && c.dealStatus !== dealStatusF) return false;
       if (q) {
         const hay = ((c.name || '') + ' ' + (c.phone || '') + ' ' + (c.altPhone || '')).toLowerCase();
         if (!hay.includes(q)) return false;
@@ -862,6 +895,7 @@
     return '<div class="item-card" data-cust-id="' + c.id + '" onclick="toggleCustomerDetail(\'' + c.id + '\')">' +
       '<div class="title">' + (c.name || '(이름없음)') + '</div>' +
       '<div class="type-summary">' +
+        (c.dealType ? '<span class="badge badge-deal">' + c.dealType + '</span>' : '') +
         (c.custStatus ? '<span class="badge badge-deal">' + c.custStatus + '</span>' : '') +
         (c.dealStatus ? '<span class="badge badge-deal">' + c.dealStatus + '</span>' : '') +
       '</div>' +
@@ -883,6 +917,7 @@
     const linked = linkedProperties(c.id);
 
     let html = '<div style="padding-top:10px; margin-top:8px; border-top:1px dashed #eee;" onclick="event.stopPropagation()">';
+    html += row('거래유형', c.dealType);
     html += row('연락처', c.phone, true);
     html += row('추가연락처', c.altPhone);
     html += row('통신사', c.telco);
@@ -940,6 +975,7 @@
       telco: document.getElementById('cust_telco').value,
       relation: document.getElementById('cust_relation').value,
       adName: document.getElementById('cust_adName').value,
+      dealType: document.getElementById('cust_dealType').value,
       channel: document.getElementById('cust_channel').value,
       custStatus: document.getElementById('cust_status').value,
       dealStatus: document.getElementById('cust_dealStatus').value,
