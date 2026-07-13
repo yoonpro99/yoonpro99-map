@@ -14,6 +14,9 @@
   .sidebar-header .count { font-size: 12px; color: #888; margin-top:8px; }
   .btn-new { width:100%; padding:10px; background:#00a844; color:white; border:none; border-radius:6px; font-weight:bold; font-size:13px; cursor:pointer; }
   .btn-new:hover { background:#009440; }
+  .sidebar-header-row2 { display:flex; gap:6px; margin-top:6px; }
+  .btn-secondary { flex:1; padding:8px; background:#f0f0f0; color:#333; border:none; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; }
+  .btn-secondary:hover { background:#e4e4e4; }
   .list-container { flex: 1; overflow-y: auto; }
   .item-card { padding: 14px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
   .item-card:hover { background: #f9f9f9; }
@@ -59,6 +62,7 @@
   .modal-overlay { display:none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index: 1999; }
   .modal { display:none; position: fixed; top:50%; left:50%; transform: translate(-50%,-50%); background:white; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.25); z-index:2000; width:420px; max-height:85vh; overflow-y:auto; padding:22px; }
   .modal.modal-narrow { width:380px; }
+  .modal.modal-wide { width:640px; }
   .modal h3 { margin-top:0; color:#333; border-bottom:2px solid #00a844; padding-bottom:8px; font-size:16px; }
   .name-preview { background:#f5f9f5; border:1px dashed #cbe6cb; border-radius:6px; padding:8px 10px; font-size:12px; color:#555; margin-bottom:10px; }
   .customer-preview { background:#f5f7fb; border:1px dashed #cdd6ea; border-radius:6px; padding:8px 10px; font-size:12px; color:#555; margin-bottom:14px; }
@@ -91,6 +95,7 @@
       box-sizing: border-box;
     }
     .modal.modal-narrow { width: 100%; }
+    .modal.modal-wide { width: 100%; }
     /* 저장/취소/삭제 버튼을 화면 하단에 고정 -> 키보드가 올라와도 항상 접근 가능 */
     .modal .btn-area {
       position: sticky;
@@ -117,6 +122,10 @@
     <div class="sidebar-header">
       <h2>매물 목록</h2>
       <button class="btn-new" style="width:100%;" onclick="startRegister()">+ 신규 매물 등록</button>
+      <div class="sidebar-header-row2">
+        <button class="btn-secondary" onclick="openCustomerModal('create')">+ 고객 등록</button>
+        <button class="btn-secondary" onclick="openCustomerListModal()">고객 목록</button>
+      </div>
       <div class="count" id="listCount">불러오는 중...</div>
     </div>
     <div class="list-container" id="itemList"></div>
@@ -492,6 +501,33 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="customerListModalOverlay" onclick="closeCustomerListModal()"></div>
+<div class="modal modal-wide" id="customerListModal">
+  <h3>고객 목록</h3>
+  <div class="search-row-main" style="margin-bottom:10px;">
+    <input type="text" id="custListSearch" placeholder="이름/연락처 검색" oninput="renderCustomerList()">
+    <select id="custListStatus" onchange="renderCustomerList()">
+      <option value="">고객상태: 전체</option>
+      <option value="활성">활성</option>
+      <option value="비활성">비활성</option>
+    </select>
+    <select id="custListDealStatus" onchange="renderCustomerList()">
+      <option value="">계약상태: 전체</option>
+      <option value="신규">신규</option>
+      <option value="상담중">상담중</option>
+      <option value="계약완료">계약완료</option>
+      <option value="보류">보류</option>
+      <option value="취소">취소</option>
+    </select>
+  </div>
+  <div class="count" id="custListCount"></div>
+  <div id="customerListContainer" style="max-height:55vh; overflow-y:auto; border:1px solid #eee; border-radius:6px;"></div>
+  <div class="btn-area">
+    <button class="btn btn-cancel" onclick="closeCustomerListModal()">닫기</button>
+    <button class="btn btn-submit" onclick="closeCustomerListModal(); openCustomerModal('create');">+ 고객 등록</button>
+  </div>
+</div>
+
 <!-- appkey를 본인의 카카오 JavaScript 키로 교체하세요. libraries=services는 주소 검색(지오코딩)에 필요합니다 -->
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=3e39f7248f3829204f5bd2ef0cf24e94&libraries=services"></script>
 <script>
@@ -777,6 +813,116 @@
   function closeCustomerModal() {
     document.getElementById('customerModal').style.display = 'none';
     document.getElementById('customerModalOverlay').style.display = 'none';
+  }
+
+  // ===== 고객 목록 화면 =====
+  function openCustomerListModal() {
+    document.getElementById('custListSearch').value = '';
+    document.getElementById('custListStatus').value = '';
+    document.getElementById('custListDealStatus').value = '';
+    renderCustomerList();
+    document.getElementById('customerListModal').style.display = 'block';
+    document.getElementById('customerListModalOverlay').style.display = 'block';
+  }
+
+  function closeCustomerListModal() {
+    document.getElementById('customerListModal').style.display = 'none';
+    document.getElementById('customerListModalOverlay').style.display = 'none';
+  }
+
+  function renderCustomerList() {
+    const q = document.getElementById('custListSearch').value.trim().toLowerCase();
+    const statusF = document.getElementById('custListStatus').value;
+    const dealF = document.getElementById('custListDealStatus').value;
+
+    const filtered = (currentCustomers || []).filter(c => {
+      if (statusF && c.custStatus !== statusF) return false;
+      if (dealF && c.dealStatus !== dealF) return false;
+      if (q) {
+        const hay = ((c.name || '') + ' ' + (c.phone || '') + ' ' + (c.altPhone || '')).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    document.getElementById('custListCount').innerText = filtered.length + '명 (전체 ' + (currentCustomers || []).length + '명)';
+
+    const container = document.getElementById('customerListContainer');
+    container.innerHTML = filtered.length
+      ? filtered.map(c => customerCardHtml(c)).join('')
+      : '<div style="padding:24px; color:#999; text-align:center; font-size:13px;">검색 결과가 없습니다.</div>';
+  }
+
+  function linkedProperties(customerId) {
+    return (currentData || []).filter(p => String(p.customerId) === String(customerId));
+  }
+
+  function customerCardHtml(c) {
+    const linked = linkedProperties(c.id);
+    return '<div class="item-card" data-cust-id="' + c.id + '" onclick="toggleCustomerDetail(\'' + c.id + '\')">' +
+      '<div class="title">' + (c.name || '(이름없음)') + '</div>' +
+      '<div class="type-summary">' +
+        (c.custStatus ? '<span class="badge badge-deal">' + c.custStatus + '</span>' : '') +
+        (c.dealStatus ? '<span class="badge badge-deal">' + c.dealStatus + '</span>' : '') +
+      '</div>' +
+      (c.phone ? '<div class="addr">' + c.phone + '</div>' : '') +
+      (linked.length ? '<div class="customer">연결된 매물 ' + linked.length + '건</div>' : '') +
+      '<div class="cust-detail" id="custDetail_' + c.id + '" style="display:none;"></div>' +
+    '</div>';
+  }
+
+  function toggleCustomerDetail(id) {
+    const el = document.getElementById('custDetail_' + id);
+    if (!el) return;
+    const wasOpen = el.style.display === 'block';
+    document.querySelectorAll('[id^="custDetail_"]').forEach(d => { d.style.display = 'none'; d.innerHTML = ''; });
+    if (wasOpen) return; // 같은 항목 다시 클릭하면 닫기만 함
+
+    const c = (currentCustomers || []).find(x => String(x.id) === String(id));
+    if (!c) return;
+    const linked = linkedProperties(c.id);
+
+    let html = '<div style="padding-top:10px; margin-top:8px; border-top:1px dashed #eee;" onclick="event.stopPropagation()">';
+    html += row('연락처', c.phone, true);
+    html += row('추가연락처', c.altPhone);
+    html += row('통신사', c.telco);
+    html += row('고객유형', c.custType);
+    html += row('관계', c.relation);
+    html += row('유입경로', c.channel);
+    html += row('광고용이름', c.adName);
+    html += row('메모', c.memo);
+
+    if (linked.length) {
+      html += '<div class="section-label" style="margin-top:10px;">연결된 매물 (' + linked.length + '건)</div>';
+      linked.forEach(p => {
+        html += '<div class="item-card" style="border:1px solid #eee; border-radius:6px; margin-bottom:6px;" onclick="event.stopPropagation(); focusPropertyById(\'' + p.id + '\')">' +
+          '<div class="title" style="font-size:13px;">' + (p.name || '') + '</div>' +
+          '<div class="addr">' + (p.address || '') + '</div>' +
+        '</div>';
+      });
+    } else {
+      html += '<div class="section-label" style="margin-top:10px; color:#aaa;">연결된 매물이 없습니다.</div>';
+    }
+
+    html += '<div class="btn-area" style="margin-top:10px;">' +
+      '<button class="btn btn-cancel" onclick="event.stopPropagation(); closeCustomerListModal(); openCustomerModal(\'edit\', currentCustomers.find(function(x){return String(x.id)===\'' + c.id + '\';}))">정보 수정</button>' +
+    '</div>';
+    html += '</div>';
+
+    el.innerHTML = html;
+    el.style.display = 'block';
+  }
+
+  // 고객 상세에서 연결된 매물을 클릭하면 지도/목록에서 바로 그 매물을 열어줍니다.
+  function focusPropertyById(id) {
+    const item = (currentData || []).find(p => String(p.id) === String(id));
+    if (!item) {
+      alert('매물 데이터를 찾을 수 없습니다. (삭제되었거나 목록이 아직 갱신되지 않았을 수 있어요)');
+      return;
+    }
+    closeCustomerListModal();
+    if (map.getLevel() > 3) map.setLevel(3);
+    selectItem(item);
   }
 
   function saveCustomer() {
