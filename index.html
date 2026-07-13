@@ -316,6 +316,7 @@
         <span class="area-preview" id="pv_area_land"></span>
       </div>
     </div>
+    <div id="extra_토지"></div>
   </div>
 
   <div class="conditional-block" data-type="상가">
@@ -598,10 +599,13 @@
     ],
     // 매물유형별 전용 필드 (기존 conditional-block 안에 있던 대지/공급/전용 면적 입력은 그대로 유지되고,
     // 여기 정의된 필드들만 자동 생성되어 각 블록 하단에 추가됩니다)
-    토지: [],
+    토지: [
+      { key: 'extraJibun', domId: 'extraJibun_0', label: '추가 필지 (쉼표로 구분)', type: 'text', placeholder: '예: 125, 126-1, 127-2' }
+    ],
     // 참고: key는 payload/시트 항목명(공통), domId는 실제 <input> id(유형마다 다른 블록에 있으므로 겹치지 않게 접미사 부여)
     상가: [
       { key: 'buildingName', domId: 'buildingName_1', label: '건물명', type: 'text' },
+      { key: 'unitNumber', domId: 'unitNumber_1', label: '호수', type: 'text', placeholder: '예: 302호' },
       { key: 'floorInfo', domId: 'floorInfo_1', label: '해당층/총층', type: 'text' },
       { key: 'approvalDate', domId: 'approvalDate_1', label: '사용승인일', type: 'date' },
       { key: 'parking', domId: 'parking_1', label: '주차', type: 'text' }
@@ -1726,6 +1730,7 @@
 
   // 설정 배열 기반으로 폼 필드 자동 생성 (등록/수정 폼 공통)
   renderFieldsInto('commonExtraFields', FIELD_CONFIG.common);
+  renderFieldsInto('extra_토지', FIELD_CONFIG.토지);
   renderFieldsInto('extra_상가', FIELD_CONFIG.상가);
   renderFieldsInto('extra_공장창고', FIELD_CONFIG.공장창고);
   renderFieldsInto('extra_주택', FIELD_CONFIG.주택);
