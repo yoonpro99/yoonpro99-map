@@ -71,7 +71,7 @@
   .section-label { font-size:12px; font-weight:bold; color:#00a844; margin:16px 0 8px; padding-top:10px; border-top:1px solid #f0f0f0; }
   .conditional-block { display:none; }
   .area-preview { display:block; font-size:11px; color:#3a6bd8; margin-top:2px; }
-  .btn-area { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .btn-area { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-top:18px; }
   .btn { padding:8px 16px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; font-size:13px; }
   .btn-submit { background:#00a844; color:white; }
   .btn-delete { background:#ff4d4f; color:white; margin-right:auto; }
@@ -280,7 +280,7 @@
       <button type="button" class="btn btn-cancel" style="flex:1;" id="btnEditCustomer" onclick="editResolvedCustomer()" disabled>선택 고객 정보수정</button>
     </div>
   </div>
-  <datalist id="occupancyList"><option value="공실"></datalist>
+  <datalist id="occupancyList"><option value="공실"><option value="임차중"></datalist>
 
   <div class="section-label" style="margin-top:6px;">공통 추가정보</div>
   <div id="commonExtraFields"></div>
@@ -410,6 +410,7 @@
 
   <div class="btn-area">
     <button class="btn btn-delete" id="btnDelete" onclick="deleteProperty()" style="display:none;">삭제</button>
+    <button class="btn btn-cancel" id="btnClone" onclick="cloneAsNewProperty()" style="display:none;">복제해서 새 매물 등록</button>
     <button class="btn btn-cancel" onclick="closeModal()">취소</button>
     <button class="btn btn-submit" onclick="saveProperty()">저장</button>
   </div>
@@ -552,6 +553,7 @@
       { key: 'buildingUnit', domId: 'buildingUnit_3', label: '해당동', type: 'text', placeholder: '예: 101동' },
       { key: 'unitNumber', domId: 'unitNumber_3', label: '호수', type: 'text', placeholder: '예: 102호' },
       { key: 'floorInfo', domId: 'floorInfo_3', label: '해당층/총층', type: 'text' },
+      { key: 'occupancyStatus', domId: 'occupancyStatus_3', label: '임대현황', type: 'text', placeholder: '예: 공실 / 임차인 2027-03 만기', list: 'occupancyList' },
       { key: 'approvalDate', domId: 'approvalDate_3', label: '사용승인일', type: 'date' },
       { key: 'households', domId: 'households_3', label: '세대수', type: 'number' },
       { key: 'parking', domId: 'parking_3', label: '주차', type: 'text' },
@@ -588,7 +590,8 @@
           (f.areaPreview ? ' oninput="updateAreaPreview(this,\'pv_' + (f.domId || f.key) + '\')"' : '') + '>';
       } else {
         inputHtml = '<input type="text" id="' + id + '"' +
-          (f.placeholder ? ' placeholder="' + f.placeholder + '"' : '') + '>';
+          (f.placeholder ? ' placeholder="' + f.placeholder + '"' : '') +
+          (f.list ? ' list="' + f.list + '"' : '') + '>';
       }
       group.innerHTML = '<label>' + f.label + '</label>' + inputHtml +
         (f.areaPreview ? '<span class="area-preview" id="pv_' + (f.domId || f.key) + '"></span>' : '');
@@ -1300,6 +1303,7 @@
     document.getElementById('form_lat').value = "";
     document.getElementById('form_lng').value = "";
     document.getElementById('btnDelete').style.display = "none";
+    document.getElementById('btnClone').style.display = "none";
     showModal();
   }
 
@@ -1389,7 +1393,31 @@
     toggleConditionalFields();
     togglePriceFields();
     document.getElementById('btnDelete').style.display = "inline-block";
+    document.getElementById('btnClone').style.display = "inline-block";
     showModal();
+  }
+
+  // 같은 매물을 거래유형/가격만 바꿔서 새 매물로 등록할 때 씁니다.
+  // (예: 이미 "매도"로 등록된 매물이 "월세"로도 가능해진 경우 -> 복제 후 거래유형/가격만 새로 입력)
+  // 주소/좌표/면적/건물명 등 공통 정보는 그대로 유지되어, 지도에서는 같은 위치에 매물이 한 건 더 묶여 보입니다.
+  function cloneAsNewProperty() {
+    if (!confirm('현재 매물 정보를 복사해서 새 매물로 등록합니다.\n거래유형과 가격을 새로 입력한 뒤 저장해주세요.')) return;
+
+    document.getElementById('form_id').value = ''; // 비우면 저장 시 수정이 아니라 신규 등록으로 처리됨
+    document.getElementById('modalTitle').innerText = '매물 등록 (복제됨 - 거래유형/가격을 확인하세요)';
+    document.getElementById('btnDelete').style.display = 'none';
+    document.getElementById('btnClone').style.display = 'none';
+
+    // 가격 관련 필드는 거래유형이 바뀌면 의미가 달라지므로 비워서 새로 입력하게 함
+    ['form_price_sale', 'form_deposit_jeonse', 'form_deposit_yearly', 'form_yearly',
+     'form_deposit_monthly', 'form_monthly', 'form_maintenanceFee', 'form_maintenanceFeeItems',
+     'form_premium'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    togglePriceFields();
+    document.getElementById('form_dealType').focus();
   }
 
   function showModal() {
