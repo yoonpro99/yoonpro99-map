@@ -455,7 +455,7 @@
   <div class="form-group"><label>광고용이름</label><input type="text" id="cust_adName" placeholder="블로그/광고에 노출할 이름(선택)"></div>
   <div class="form-group">
     <label>거래유형</label>
-    <select id="cust_dealType">
+    <select id="cust_dealType" onchange="toggleWishConditionBlock()">
       <option value=""></option>
       <optgroup label="공급 (매물주)">
         <option value="매도">매도</option>
@@ -506,6 +506,36 @@
       <option value="보류">보류</option>
       <option value="취소">취소</option>
     </select>
+  </div>
+  <div id="wishConditionBlock" style="display:none;">
+    <div class="section-label" style="margin-top:6px;">희망 조건 (매물 찾는 손님)</div>
+    <div class="form-group">
+      <label>희망매물종류 (복수 추가 가능)</label>
+      <div class="form-row">
+        <select id="wishTypeSelect" onchange="updateWishKindOptions()">
+          <option value="">유형 선택</option>
+          <option value="주택">주택</option>
+          <option value="상가">상가</option>
+          <option value="토지">토지</option>
+          <option value="공장창고">공장창고</option>
+        </select>
+        <select id="wishKindSelect"><option value="">상세(선택 안 하면 유형 전체)</option></select>
+      </div>
+      <button type="button" class="btn btn-cancel" style="margin-top:6px;" onclick="addWishKind()">+ 추가</button>
+      <div id="wishKindChips" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;"></div>
+    </div>
+    <div class="form-group">
+      <label>희망지역 (복수 추가 가능)</label>
+      <div class="form-row">
+        <input type="text" id="wishRegionInput" list="locationsList" placeholder="예: 한림읍 또는 협재리">
+      </div>
+      <button type="button" class="btn btn-cancel" style="margin-top:6px;" onclick="addWishRegion()">+ 추가</button>
+      <div id="wishRegionChips" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>희망가격 최소(만원)</label><input type="text" id="cust_priceMin" inputmode="numeric"></div>
+      <div class="form-group"><label>희망가격 최대(만원)</label><input type="text" id="cust_priceMax" inputmode="numeric"></div>
+    </div>
   </div>
   <div class="form-group"><label>메모</label><textarea id="cust_memo"></textarea></div>
   <div class="btn-area">
@@ -569,7 +599,10 @@
   let map, markers = [], currentData = [], currentCustomers = [];
   const geocoder = new kakao.maps.services.Geocoder();
 
-  const LOCATIONS = ["서귀포시 강정동", "서귀포시 남원읍 남원리", "서귀포시 남원읍 위미리", "서귀포시 남원읍 태흥리", "서귀포시 대정읍 구억리", "서귀포시 대정읍 동일리", "서귀포시 대정읍 무릉리", "서귀포시 대정읍 보성리", "서귀포시 대정읍 신도리", "서귀포시 대정읍 일과리", "서귀포시 동홍동", "서귀포시 상예동", "서귀포시 서귀동", "서귀포시 서호동", "서귀포시 서홍동", "서귀포시 호근동", "서귀포시 성산읍 고성리", "서귀포시 성산읍 난산리", "서귀포시 성산읍 삼달리", "서귀포시 성산읍 성산리", "서귀포시 성산읍 수산리", "서귀포시 성산읍 시흥리", "서귀포시 성산읍 신산리", "서귀포시 성산읍 신천리", "서귀포시 성산읍 신풍리", "서귀포시 성산읍 오조리", "서귀포시 성산읍 온평리", "서귀포시 안덕면 감산리", "서귀포시 안덕면 덕수리", "서귀포시 안덕면 동광리", "서귀포시 안덕면 사계리", "서귀포시 안덕면 상창리", "서귀포시 안덕면 서광리", "서귀포시 안덕면 창천리", "서귀포시 안덕면 화순리", "서귀포시 중문동", "서귀포시 표선면 가시리", "서귀포시 표선면 성읍리", "서귀포시 표선면 세화리", "서귀포시 표선면 토산리", "서귀포시 표선면 표선리", "서귀포시 표선읍면 하천리", "서귀포시 하효동", "서귀포시 회수동", "제주시 건입동", "제주시 구좌읍 김녕리", "제주시 구좌읍 동복리", "제주시 구좌읍 상도리", "제주시 구좌읍 세화리", "제주시 구좌읍 송당리", "제주시 구좌읍 월정리", "제주시 구좌읍 종달리", "제주시 구좌읍 평대리", "제주시 구좌읍 하도리", "제주시 구좌읍 한동리", "제주시 구좌읍 행원리", "제주시 내도동", "제주시 노형동", "제주시 도남동", "제주시 도두이동", "제주시 도두일동", "제주시 도련이동", "제주시 도련일동", "제주시 도평동", "제주시 봉개동", "제주시 삼도이동", "제주시 삼도일동", "제주시 삼양동", "제주시 삼양삼동", "제주시 삼양이동", "제주시 삼양일동", "제주시 아라이동", "제주시 아라일동", "제주시 애월읍 고내리", "제주시 애월읍 고성리", "제주시 애월읍 곽지리", "제주시 애월읍 광령리", "제주시 애월읍 구엄리", "제주시 애월읍 금성리", "제주시 애월읍 납읍리", "제주시 애월읍 봉성리", "제주시 애월읍 상가리", "제주시 애월읍 상귀리", "제주시 애월읍 소길리", "제주시 애월읍 수산리", "제주시 애월읍 신엄리", "제주시 애월읍 애월리", "제주시 애월읍 어음리", "제주시 애월읍 유수암리", "제주시 애월읍 장전리", "제주시 애월읍 하가리", "제주시 애월읍 하귀1리", "제주시 애월읍 하귀2리", "제주시 연동", "제주시 영평동", "제주시 오등동", "제주시 오라삼동", "제주시 오라이동", "제주시 오라일동", "제주시 외도이동", "제주시 외도일동", "제주시 용강동", "제주시 용담삼동", "제주시 용담이동", "제주시 용담일동", "제주시 우도면", "제주시 월평동", "제주시 이도이동", "제주시 이도일동", "제주시 이호이동", "제주시 이호일동", "제주시 일도이동", "제주시 일도일동", "제주시 조천읍 교래리", "제주시 조천읍 대흘리", "제주시 조천읍 북촌리", "제주시 조천읍 선흘리", "제주시 조천읍 신촌리", "제주시 조천읍 신흥리", "제주시 조천읍 와산리", "제주시 조천읍 와흘리", "제주시 조천읍 조천리", "제주시 조천읍 함덕리", "제주시 추자면", "제주시 한경면 고산리", "제주시 한경면 금등리", "제주시 한경면 낙천리", "제주시 한경면 두모리", "제주시 한경면 신창리", "제주시 한경면 용수리", "제주시 한경면 저지리", "제주시 한경면 조수리", "제주시 한경면 청수리", "제주시 한경면 판포리", "제주시 한림읍 귀덕리", "제주시 한림읍 금능리", "제주시 한림읍 금악리", "제주시 한림읍 대림리", "제주시 한림읍 동명리", "제주시 한림읍 명월리", "제주시 한림읍 상대리", "제주시 한림읍 상명리", "제주시 한림읍 수원리", "제주시 한림읍 옹포리", "제주시 한림읍 월령리", "제주시 한림읍 월림리", "제주시 한림읍 한림리", "제주시 한림읍 한수리", "제주시 한림읍 협재리", "제주시 해안동", "제주시 화북이동", "제주시 화북일동", "제주시 회천동"];
+  // v14: 소재지 자동완성 목록은 더 이상 여기 하드코딩하지 않습니다.
+  // Locations 시트를 doGet이 매번 읽어 내려주고, loadData()에서 currentLocations에 담아
+  // locationsList(datalist)를 채웁니다. Locations 시트만 고치면 새로고침 시 바로 반영됩니다.
+  let currentLocations = [];
 
   const KIND_OPTIONS = {
     '주택': ["원룸", "2룸", "3룸", "단독", "단독다가구", "구옥", "전원농가", "타운하우스", "아파트", "빌라", "연립", "다세대", "오피스텔", "생활숙박시설"],
@@ -728,7 +761,12 @@
     }
   }
 
-  document.getElementById('locationsList').innerHTML = LOCATIONS.map(l => '<option value="' + l + '">').join('');
+  // v14: Locations 시트에서 읽어온 목록으로 소재지/희망지역 자동완성을 채웁니다.
+  function populateLocationsList(locations) {
+    document.getElementById('locationsList').innerHTML =
+      locations.map(l => '<option value="' + l + '">').join('');
+  }
+
   const MARKER_COLORS = { '토지': '#000000', '주택': '#9C27B0', '상가': '#F44336', '공장창고': '#2196F3' };
   const markerImageCache = {};
 
@@ -784,7 +822,9 @@
         if (data.error) { alert(data.error); return; }
         currentData = data.properties || [];
         currentCustomers = data.customers || [];
+        currentLocations = data.locations || []; // v14: Locations 시트에서 매번 새로 읽어온 목록
         populateCustomerList(currentCustomers);
+        populateLocationsList(currentLocations);
         applyFilters(fitBounds); // 최초 로드 시에는 지도 범위도 자동으로 맞춤
       })
       .catch(err => alert("데이터 로딩 실패: " + err));
@@ -824,6 +864,65 @@
     if (c) openCustomerModal('edit', c);
   }
 
+  // ===== v14: 수요 고객(매물 찾는 손님) 희망 조건 =====
+  const DEMAND_DEAL_TYPES = ["매수", "임차 전세", "임차 연세", "임차 월세", "임차 단기"];
+  let wishKindChips = [];   // 예: ["주택:아파트", "상가"]
+  let wishRegionChips = []; // 예: ["한림읍", "협재리"]
+
+  function toggleWishConditionBlock() {
+    const isDemand = DEMAND_DEAL_TYPES.indexOf(document.getElementById('cust_dealType').value) !== -1;
+    document.getElementById('wishConditionBlock').style.display = isDemand ? 'block' : 'none';
+  }
+
+  function updateWishKindOptions() {
+    const type = document.getElementById('wishTypeSelect').value;
+    const opts = KIND_OPTIONS[type] || [];
+    document.getElementById('wishKindSelect').innerHTML =
+      '<option value="">상세(선택 안 하면 유형 전체)</option>' +
+      opts.map(o => '<option value="' + o + '">' + o + '</option>').join('');
+  }
+
+  function addWishKind() {
+    const type = document.getElementById('wishTypeSelect').value;
+    if (!type) { alert('희망매물유형을 선택해주세요.'); return; }
+    const kind = document.getElementById('wishKindSelect').value;
+    const token = kind ? (type + ':' + kind) : type; // 상세 미선택 시 유형 전체를 의미
+    if (wishKindChips.indexOf(token) === -1) wishKindChips.push(token);
+    document.getElementById('wishTypeSelect').value = '';
+    document.getElementById('wishKindSelect').innerHTML = '<option value="">상세(선택 안 하면 유형 전체)</option>';
+    renderWishKindChips();
+  }
+
+  function removeWishKind(token) {
+    wishKindChips = wishKindChips.filter(t => t !== token);
+    renderWishKindChips();
+  }
+
+  function renderWishKindChips() {
+    document.getElementById('wishKindChips').innerHTML = wishKindChips.map(t =>
+      '<span class="badge badge-deal" style="cursor:pointer;" onclick="removeWishKind(\'' + t + '\')">' + t + ' ✕</span>'
+    ).join('');
+  }
+
+  function addWishRegion() {
+    const v = document.getElementById('wishRegionInput').value.trim();
+    if (!v) return;
+    if (wishRegionChips.indexOf(v) === -1) wishRegionChips.push(v);
+    document.getElementById('wishRegionInput').value = '';
+    renderWishRegionChips();
+  }
+
+  function removeWishRegion(v) {
+    wishRegionChips = wishRegionChips.filter(x => x !== v);
+    renderWishRegionChips();
+  }
+
+  function renderWishRegionChips() {
+    document.getElementById('wishRegionChips').innerHTML = wishRegionChips.map(v =>
+      '<span class="badge badge-deal" style="cursor:pointer;" onclick="removeWishRegion(\'' + v + '\')">' + v + ' ✕</span>'
+    ).join('');
+  }
+
   function openCustomerModal(mode, customer) {
     document.getElementById('customerModalTitle').innerText = (mode === 'edit') ? '고객 정보 수정' : '신규 고객 등록';
     const c = (mode === 'edit' && customer) ? customer : {};
@@ -840,6 +939,19 @@
     document.getElementById('cust_status').value = c.custStatus || '';
     document.getElementById('cust_dealStatus').value = c.dealStatus || '';
     document.getElementById('cust_memo').value = c.memo || '';
+
+    // v14: 희망 조건 채우기 (수정 모드면 기존 값을 칩으로 복원, 신규면 비움)
+    wishKindChips = (c.wishKinds || '').split(',').map(s => s.trim()).filter(s => s.length > 0);
+    wishRegionChips = (c.wishRegions || '').split(',').map(s => s.trim()).filter(s => s.length > 0);
+    renderWishKindChips();
+    renderWishRegionChips();
+    document.getElementById('cust_priceMin').value = c.priceMin || '';
+    document.getElementById('cust_priceMax').value = c.priceMax || '';
+    document.getElementById('wishTypeSelect').value = '';
+    document.getElementById('wishKindSelect').innerHTML = '<option value="">상세(선택 안 하면 유형 전체)</option>';
+    document.getElementById('wishRegionInput').value = '';
+    toggleWishConditionBlock();
+
     document.getElementById('customerModal').style.display = 'block';
     document.getElementById('customerModalOverlay').style.display = 'block';
   }
@@ -929,6 +1041,14 @@
     html += row('관계', c.relation);
     html += row('유입경로', c.channel);
     html += row('광고용이름', c.adName);
+    if (c.wishKinds || c.wishRegions || c.priceMin || c.priceMax) {
+      html += '<div class="section-label" style="margin-top:10px;">희망 조건</div>';
+      html += row('희망매물종류', c.wishKinds);
+      html += row('희망지역', c.wishRegions);
+      if (c.priceMin || c.priceMax) {
+        html += row('희망가격', (c.priceMin ? fmtNum(c.priceMin) : '') + ' ~ ' + (c.priceMax ? fmtNum(c.priceMax) : ''));
+      }
+    }
     html += row('메모', c.memo);
 
     if (linked.length) {
@@ -983,7 +1103,12 @@
       channel: document.getElementById('cust_channel').value,
       custStatus: document.getElementById('cust_status').value,
       dealStatus: document.getElementById('cust_dealStatus').value,
-      memo: document.getElementById('cust_memo').value
+      memo: document.getElementById('cust_memo').value,
+      // v14: 수요 고객 희망 조건 (칩에 남아있는 값 그대로 저장; 입력창에 남은 미확정 값은 포함하지 않음)
+      wishKinds: wishKindChips.join(','),
+      wishRegions: wishRegionChips.join(','),
+      priceMin: document.getElementById('cust_priceMin').value,
+      priceMax: document.getElementById('cust_priceMax').value
     };
 
     fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
@@ -1043,7 +1168,7 @@
   function findLocationMatch(address) {
     if (!address) return '';
     let best = '';
-    LOCATIONS.forEach(loc => {
+    (currentLocations || []).forEach(loc => {
       if (address.indexOf(loc) === 0 && loc.length > best.length) best = loc;
     });
     return best;
