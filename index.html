@@ -36,7 +36,7 @@
   .blog-btn:hover { background:#3a6bd8; color:white; }
   .marker-label { background:white; border:1px solid #ccc; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:bold; color:#333; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
 
-  .item-card.selected { background:#f5f9f5; }
+  .item-card.selected { background:#c7ecd2; border-left:4px solid #00a844; padding-left:16px; }
   .inline-detail { background:#fafcfa; border-top:2px solid #00a844; border-bottom:1px solid #e0e0e0; padding:14px 20px; }
   .inline-detail .info-badges { margin-bottom:8px; }
   .info-row { display:flex; padding:6px 0; border-bottom:1px solid #f0f0f0; font-size:13px; }
@@ -45,7 +45,7 @@
   .info-btn-area { display:flex; gap:8px; margin-top:14px; }
 
   .map-area { flex: 1; height: 100%; position: relative; display:flex; flex-direction:column; }
-  #map { flex:1; width: 100%; touch-action: none; }
+  #map { flex:1; width: 100%; touch-action: none; -ms-touch-action: none; -ms-content-zooming: none; }
 
   .map-search-bar { background:white; border-bottom:1px solid #e0e0e0; padding:8px 12px; z-index:20; }
   .search-row-main { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
@@ -284,6 +284,11 @@
   <datalist id="occupancyList"><option value="공실"><option value="임차중"></datalist>
 
   <div class="section-label" style="margin-top:6px;">공통 추가정보</div>
+  <div class="form-group">
+    <label>대지면적(㎡) <span id="landAreaRequiredMark" style="color:#d9534f; display:none;">* 매도 시 필수</span></label>
+    <input type="number" id="form_area_land_common" oninput="updateAreaPreview(this,'pv_area_land_common')">
+    <span class="area-preview" id="pv_area_land_common"></span>
+  </div>
   <div id="commonExtraFields"></div>
 
   <div class="form-row price-sale">
@@ -309,13 +314,6 @@
 
   <div class="conditional-block" data-type="토지">
     <div class="section-label">토지 정보</div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>대지(㎡)</label>
-        <input type="number" id="form_area_land" oninput="updateAreaPreview(this,'pv_area_land')">
-        <span class="area-preview" id="pv_area_land"></span>
-      </div>
-    </div>
     <div id="extra_토지"></div>
   </div>
 
@@ -350,11 +348,6 @@
     <div class="section-label">공장창고 정보</div>
     <div class="form-row">
       <div class="form-group">
-        <label>대지(㎡)</label>
-        <input type="number" id="form_area_land_2" oninput="updateAreaPreview(this,'pv_area_land_2')">
-        <span class="area-preview" id="pv_area_land_2"></span>
-      </div>
-      <div class="form-group">
         <label>공급(㎡)</label>
         <input type="number" id="form_area_supply_2" oninput="updateAreaPreview(this,'pv_area_supply_2')">
         <span class="area-preview" id="pv_area_supply_2"></span>
@@ -385,11 +378,6 @@
         <input type="number" id="form_area_exclusive_3" oninput="updateAreaPreview(this,'pv_area_exclusive_3')">
         <span class="area-preview" id="pv_area_exclusive_3"></span>
       </div>
-    </div>
-    <div class="form-group">
-      <label>대지(㎡, 단독·전원주택 등)</label>
-      <input type="number" id="form_area_land_3" oninput="updateAreaPreview(this,'pv_area_land_3')">
-      <span class="area-preview" id="pv_area_land_3"></span>
     </div>
     <div class="form-row">
       <div class="form-group"><label>방</label><input type="number" id="form_rooms"></div>
@@ -796,8 +784,21 @@
   const container = document.getElementById('map');
   map = new kakao.maps.Map(container, {
     center: new kakao.maps.LatLng(33.363503, 126.554480),
-    level: 9
+    level: 9,
+    draggable: true,
+    scrollwheel: true,
+    disableDoubleClickZoom: false
   });
+  // 일부 브라우저는 터치 이벤트를 기본적으로 passive로 등록해서 카카오맵 SDK의
+  // preventDefault 호출이 무시되어 드래그/핀치줌이 안 먹는 경우가 있습니다.
+  // 지도 영역에서만 명시적으로 non-passive 리스너를 하나 더 걸어 이를 보완합니다.
+  ['touchstart', 'touchmove'].forEach(evt => {
+    container.addEventListener(evt, function () {}, { passive: false });
+  });
+
+  // v15: 일반지도/스카이뷰(위성) 전환 컨트롤을 지도 우측 상단에 추가
+  const mapTypeControl = new kakao.maps.MapTypeControl();
+  map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
 
   // 일부 태블릿/브라우저(예: 갤럭시탭 삼성인터넷)에서는 지도 컨테이너 크기가 늦게 확정되면서
   // 지도는 보이지만 드래그(이동)가 먹히지 않는 경우가 있습니다.
@@ -1584,11 +1585,14 @@
   }
 
   function togglePriceFields() {
-    const group = priceGroup(document.getElementById('form_dealType').value);
+    const dealType = document.getElementById('form_dealType').value;
+    const group = priceGroup(dealType);
     document.querySelector('.price-sale').style.display = (group === 'sale') ? 'flex' : 'none';
     document.querySelector('.price-jeonse').style.display = (group === 'jeonse') ? 'flex' : 'none';
     document.querySelector('.price-yearly').style.display = (group === 'yearly') ? 'flex' : 'none';
     document.querySelector('.price-monthly').style.display = (group === 'monthly') ? 'flex' : 'none';
+    // v15: 거래유형이 '매도'일 때 대지면적 필수 안내 표시
+    document.getElementById('landAreaRequiredMark').style.display = (dealType === '매도') ? 'inline' : 'none';
   }
 
   function resetForm() {
@@ -1662,7 +1666,8 @@
     document.getElementById('form_maintenanceFee').value = item.maintenanceFee || '';
     document.getElementById('form_maintenanceFeeItems').value = item.maintenanceFeeItems || '';
 
-    document.getElementById('form_area_land').value = item.area_land || '';
+    // v15: 대지면적은 매물유형에 상관없이 공통 입력란 하나로 통일
+    document.getElementById('form_area_land_common').value = item.area_land || '';
 
     document.getElementById('form_area_supply_1').value = item.area_supply || '';
     document.getElementById('form_area_exclusive_1').value = item.area_exclusive || '';
@@ -1671,7 +1676,6 @@
     document.getElementById('form_currentBiz').value = item.currentBiz || '';
     document.getElementById('form_recommendBiz').value = item.recommendBiz || '';
 
-    document.getElementById('form_area_land_2').value = item.area_land || '';
     document.getElementById('form_area_supply_2').value = item.area_supply || '';
     document.getElementById('form_totalFloorArea_2').value = item.totalFloorArea || '';
     document.getElementById('form_powerSupply').value = item.powerSupply || '';
@@ -1679,7 +1683,6 @@
 
     document.getElementById('form_area_supply_3').value = item.area_supply || '';
     document.getElementById('form_area_exclusive_3').value = item.area_exclusive || '';
-    document.getElementById('form_area_land_3').value = item.area_land || '';
     document.getElementById('form_rooms').value = item.rooms || '';
     document.getElementById('form_bathrooms').value = item.bathrooms || '';
     document.getElementById('form_direction').value = item.direction || '';
@@ -1687,9 +1690,9 @@
     document.getElementById('form_structureNote').value = item.structureNote || '';
 
     // 면적 입력란 평 환산 미리보기 갱신
-    ['form_area_land', 'form_area_supply_1', 'form_area_exclusive_1', 'form_totalFloorArea_1',
-     'form_area_land_2', 'form_area_supply_2', 'form_totalFloorArea_2',
-     'form_area_supply_3', 'form_area_exclusive_3', 'form_area_land_3'].forEach(id => {
+    ['form_area_land_common', 'form_area_supply_1', 'form_area_exclusive_1', 'form_totalFloorArea_1',
+     'form_area_supply_2', 'form_totalFloorArea_2',
+     'form_area_supply_3', 'form_area_exclusive_3'].forEach(id => {
       const el = document.getElementById(id);
       updateAreaPreview(el, 'pv_' + id.replace('form_', ''));
     });
@@ -1782,9 +1785,10 @@
       payload.monthly = document.getElementById('form_monthly').value;
     }
 
-    if (type === '토지') {
-      payload.area_land = document.getElementById('form_area_land').value;
-    } else if (type === '상가') {
+    // v15: 대지면적은 매물유형에 상관없이 공통 입력란(form_area_land_common) 하나로 통일
+    payload.area_land = document.getElementById('form_area_land_common').value;
+
+    if (type === '상가') {
       payload.area_supply = document.getElementById('form_area_supply_1').value;
       payload.area_exclusive = document.getElementById('form_area_exclusive_1').value;
       payload.totalFloorArea = document.getElementById('form_totalFloorArea_1').value;
@@ -1792,7 +1796,6 @@
       payload.currentBiz = document.getElementById('form_currentBiz').value;
       payload.recommendBiz = document.getElementById('form_recommendBiz').value;
     } else if (type === '공장창고') {
-      payload.area_land = document.getElementById('form_area_land_2').value;
       payload.area_supply = document.getElementById('form_area_supply_2').value;
       payload.totalFloorArea = document.getElementById('form_totalFloorArea_2').value;
       payload.powerSupply = document.getElementById('form_powerSupply').value;
@@ -1800,7 +1803,6 @@
     } else if (type === '주택') {
       payload.area_supply = document.getElementById('form_area_supply_3').value;
       payload.area_exclusive = document.getElementById('form_area_exclusive_3').value;
-      payload.area_land = document.getElementById('form_area_land_3').value;
       payload.rooms = document.getElementById('form_rooms').value;
       payload.bathrooms = document.getElementById('form_bathrooms').value;
       payload.direction = document.getElementById('form_direction').value;
@@ -1820,6 +1822,13 @@
 
     if (!payload.address || !payload.lat || !payload.lng) {
       alert("먼저 소재지를 입력하고 '위치 확인' 버튼을 눌러 좌표를 계산해주세요.");
+      return;
+    }
+
+    // v15: 거래유형이 '매도'면 매물유형에 상관없이 대지면적 입력이 필수
+    if (payload.dealType === '매도' && !payload.area_land) {
+      alert("거래유형이 '매도'인 매물은 대지면적(㎡)을 입력해야 합니다.");
+      document.getElementById('form_area_land_common').focus();
       return;
     }
 
