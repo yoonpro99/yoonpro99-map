@@ -213,7 +213,7 @@
   <div class="form-row">
     <div class="form-group">
       <label>매물유형</label>
-      <select id="form_type" onchange="refreshKindOptions(); toggleConditionalFields()">
+      <select id="form_type" onchange="refreshKindOptions(); toggleConditionalFields(); updateAreaRequiredHint();">
         <option value="토지">토지</option>
         <option value="상가">상가</option>
         <option value="공장창고">공장창고</option>
@@ -222,7 +222,7 @@
     </div>
     <div class="form-group">
       <label>매물유형상세</label>
-      <select id="form_kind"></select>
+      <select id="form_kind" onchange="updateAreaRequiredHint()"></select>
     </div>
   </div>
 
@@ -249,6 +249,7 @@
       </select>
     </div>
   </div>
+  <div id="areaRequiredHint" style="font-size:12px; color:#d9534f; margin-top:-4px; margin-bottom:10px;"></div>
 
   <div class="section-label" style="margin-top:6px;">소재지</div>
   <div class="form-group">
@@ -285,7 +286,7 @@
 
   <div class="section-label" style="margin-top:6px;">공통 추가정보</div>
   <div class="form-group">
-    <label>대지면적(㎡) <span id="landAreaRequiredMark" style="color:#d9534f; display:none;">* 매도 시 필수</span></label>
+    <label>대지면적(㎡)</label>
     <input type="number" id="form_area_land_common" oninput="updateAreaPreview(this,'pv_area_land_common')">
     <span class="area-preview" id="pv_area_land_common"></span>
   </div>
@@ -1591,8 +1592,59 @@
     document.querySelector('.price-jeonse').style.display = (group === 'jeonse') ? 'flex' : 'none';
     document.querySelector('.price-yearly').style.display = (group === 'yearly') ? 'flex' : 'none';
     document.querySelector('.price-monthly').style.display = (group === 'monthly') ? 'flex' : 'none';
-    // v15: 거래유형이 '매도'일 때 대지면적 필수 안내 표시
-    document.getElementById('landAreaRequiredMark').style.display = (dealType === '매도') ? 'inline' : 'none';
+    updateAreaRequiredHint();
+  }
+
+  // v16: 매물유형/매물유형상세/거래유형에 따라 평단가 계산에 실제로 쓰이는 면적 필드를 하나로 결정합니다.
+  // (Property 시트 Z열 평단가 수식과 반드시 동일한 기준을 사용해야 함 - 아래 REQUIRED_AREA_LABELS 참고)
+  //  - 매도: 토지/공장창고/주택(단독계열) = 대지, 상가/주택(그 외) = 공급
+  //  - 임대(전세/연세/월세/단기): 토지 = 대지, 공장창고 = 연면적, 그 외(주택/상가) = 전용
+  function requiredAreaFieldInfo() {
+    const type = document.getElementById('form_type').value;
+    const kind = document.getElementById('form_kind').value;
+    const dealType = document.getElementById('form_dealType').value;
+    const group = priceGroup(dealType); // 'sale' | 'jeonse' | 'yearly' | 'monthly'
+    const isLease = (group !== 'sale');
+
+    if (!isLease) {
+      // ---- 매도 ----
+      if (type === '토지' || type === '공장창고') {
+        return { id: 'form_area_land_common', label: '대지면적(㎡)' };
+      }
+      if (type === '상가') {
+        return { id: 'form_area_supply_1', label: '공급(㎡)' };
+      }
+      if (type === '주택') {
+        if (STANDALONE_HOUSE_KINDS.indexOf(kind) !== -1) {
+          return { id: 'form_area_land_common', label: '대지면적(㎡)' };
+        }
+        return { id: 'form_area_supply_3', label: '공급(㎡)' };
+      }
+      return null;
+    }
+
+    // ---- 임대(전세/연세/월세/단기) ----
+    if (type === '토지') {
+      return { id: 'form_area_land_common', label: '대지면적(㎡)' };
+    }
+    if (type === '공장창고') {
+      return { id: 'form_totalFloorArea_2', label: '연면적(㎡)' };
+    }
+    if (type === '상가') {
+      return { id: 'form_area_exclusive_1', label: '전용(㎡)' };
+    }
+    if (type === '주택') {
+      return { id: 'form_area_exclusive_3', label: '전용(㎡)' };
+    }
+    return null;
+  }
+
+  // 화면 상단에 "평단가 계산을 위해 OOO 입력이 필요합니다" 안내문구를 갱신합니다.
+  function updateAreaRequiredHint() {
+    const hintEl = document.getElementById('areaRequiredHint');
+    const info = requiredAreaFieldInfo();
+    if (!info) { hintEl.innerText = ''; return; }
+    hintEl.innerText = '※ 평단가 자동계산을 위해 ' + info.label + ' 입력이 필수입니다.';
   }
 
   function resetForm() {
@@ -1633,6 +1685,8 @@
     refreshKindOptions(item.kind);
     document.getElementById('form_dealType').value = item.dealType || '매도';
     document.getElementById('form_status').value = item.status || '1.광고중';
+    toggleConditionalFields();
+    togglePriceFields(); // v16: 실제 매물의 유형/거래유형 기준으로 가격 필드와 면적 필수 안내를 다시 갱신
 
     document.getElementById('form_address').value = item.address || '';
     document.getElementById('form_location').value = findLocationMatch(item.address);
@@ -1825,11 +1879,16 @@
       return;
     }
 
-    // v15: 거래유형이 '매도'면 매물유형에 상관없이 대지면적 입력이 필수
-    if (payload.dealType === '매도' && !payload.area_land) {
-      alert("거래유형이 '매도'인 매물은 대지면적(㎡)을 입력해야 합니다.");
-      document.getElementById('form_area_land_common').focus();
-      return;
+    // v16: 매물유형/매물유형상세/거래유형에 따라 평단가 계산에 필요한 면적을 필수 입력으로 검증
+    // (Property 시트 평단가 수식과 동일한 기준 - requiredAreaFieldInfo() 참고)
+    const areaInfo = requiredAreaFieldInfo();
+    if (areaInfo) {
+      const areaEl = document.getElementById(areaInfo.id);
+      if (!areaEl.value) {
+        alert('평단가 자동계산을 위해 ' + areaInfo.label + '을(를) 입력해야 합니다.');
+        areaEl.focus();
+        return;
+      }
     }
 
     fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
