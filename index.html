@@ -47,6 +47,10 @@
   .map-area { flex: 1; height: 100%; position: relative; display:flex; flex-direction:column; }
   #map { flex:1; width: 100%; touch-action: none; -ms-touch-action: none; -ms-content-zooming: none; }
 
+  /* v15: 하수처리구역 표시 옵션(체크박스) - 지도 위 우측 하단에 떠있는 작은 컨트롤 */
+  .sewage-toggle { position:absolute; right:10px; bottom:24px; z-index:20; background:white; border:1px solid #ddd; border-radius:6px; padding:7px 10px; font-size:12px; color:#333; box-shadow:0 1px 4px rgba(0,0,0,0.15); display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
+  .sewage-toggle input { width:auto; margin:0; cursor:pointer; }
+
   .map-search-bar { background:white; border-bottom:1px solid #e0e0e0; padding:8px 12px; z-index:20; }
   .search-row-main { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
   .search-row-main input, .search-row-main select { padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:white; }
@@ -197,6 +201,11 @@
       </div>
     </div>
     <div id="map"></div>
+    <!-- v15: 하수처리구역 표시 옵션 - 기본은 꺼짐(off), 사용자가 켤 때만 지도에 표시 -->
+    <label class="sewage-toggle">
+      <input type="checkbox" id="sewageToggleCheckbox" onchange="toggleSewageZones()">
+      하수처리구역 표시
+    </label>
   </div>
 </div>
 
@@ -586,6 +595,8 @@
 
 
   let map, markers = [], currentData = [], currentCustomers = [];
+  let currentSewageZonesGeoJson = null; // v15: 하수처리구역 GeoJSON(문자열) 원본 보관, 실제로 그리는 건 사용자가 체크박스를 켰을 때만
+  let sewageOverlays = []; // v15: 현재 지도에 그려진 하수처리구역 폴리곤들
   const geocoder = new kakao.maps.services.Geocoder();
 
   // v14: 소재지 자동완성 목록은 더 이상 여기 하드코딩하지 않습니다.
@@ -825,11 +836,71 @@
         currentData = data.properties || [];
         currentCustomers = data.customers || [];
         currentLocations = data.locations || []; // v14: Locations 시트에서 매번 새로 읽어온 목록
+        currentSewageZonesGeoJson = data.sewageZones || null; // v15: 원본만 저장, 자동으로 그리지 않음
         populateCustomerList(currentCustomers);
         populateLocationsList(currentLocations);
         applyFilters(fitBounds); // 최초 로드 시에는 지도 범위도 자동으로 맞춤
+        // v15: 사용자가 이전에 체크박스를 켜둔 상태로 데이터가 새로고침된 경우 다시 그려줌
+        if (document.getElementById('sewageToggleCheckbox').checked) drawSewageZones();
       })
       .catch(err => alert("데이터 로딩 실패: " + err));
+  }
+
+  // v15: 하수처리구역 폴리곤을 실제로 지도에 그림 (체크박스를 켰을 때만 호출됨)
+  function drawSewageZones() {
+    clearSewageZones();
+    if (!currentSewageZonesGeoJson) {
+      alert("하수처리구역 데이터가 아직 등록되지 않았습니다.");
+      document.getElementById('sewageToggleCheckbox').checked = false;
+      return;
+    }
+    let fc;
+    try {
+      fc = JSON.parse(currentSewageZonesGeoJson);
+    } catch (err) {
+      alert("하수처리구역 데이터를 읽는 중 오류가 발생했습니다.");
+      document.getElementById('sewageToggleCheckbox').checked = false;
+      return;
+    }
+    fc.features.forEach(feature => {
+      const polys = feature.geometry.type === "Polygon"
+        ? [feature.geometry.coordinates]
+        : feature.geometry.coordinates; // MultiPolygon
+      polys.forEach(poly => {
+        const path = poly[0].map(([lng, lat]) => new kakao.maps.LatLng(lat, lng));
+        const zonePolygon = new kakao.maps.Polygon({
+          path: path,
+          strokeWeight: 1.5,
+          strokeColor: '#0066ff',
+          strokeOpacity: 0.6,
+          fillColor: '#0066ff',
+          fillOpacity: 0.15
+        });
+        zonePolygon.setMap(map);
+        sewageOverlays.push(zonePolygon);
+      });
+    });
+  }
+
+  // v15: 지도 위에서 하수처리구역 폴리곤을 전부 지움
+  function clearSewageZones() {
+    sewageOverlays.forEach(p => p.setMap(null));
+    sewageOverlays = [];
+  }
+
+  // v15: 체크박스 클릭 시 켜기/끄기. 조각이 많아 너무 축소된 상태에서 켜면 버벅일 수 있어 안내함
+  function toggleSewageZones() {
+    const checked = document.getElementById('sewageToggleCheckbox').checked;
+    if (checked) {
+      if (map.getLevel() > 7) {
+        alert("하수처리구역은 지도를 좀 더 확대한 후 켜주세요.");
+        document.getElementById('sewageToggleCheckbox').checked = false;
+        return;
+      }
+      drawSewageZones();
+    } else {
+      clearSewageZones();
+    }
   }
 
   // 고객 검색창에 보여줄 문구: 이름 + 연락처만 사용하고 고객ID는 노출하지 않음
